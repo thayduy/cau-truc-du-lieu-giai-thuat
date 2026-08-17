@@ -1,3 +1,7 @@
+---
+slug: /
+---
+
 # CHƯƠNG 1: TỔNG QUAN VỀ CẤU TRÚC DỮ LIỆU VÀ GIẢI THUẬT
 
 > **CTDL** = **Cấu trúc dữ liệu**. **GT** = **Giải thuật** (thuật toán).  

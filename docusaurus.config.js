@@ -5,6 +5,8 @@
 // See: https://docusaurus.io/docs/api/docusaurus-config
 
 import {themes as prismThemes} from 'prism-react-renderer';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -17,6 +19,10 @@ const config = {
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
+  },
+
+  markdown: {
+    format: 'detect', // This will parse .md files as standard Markdown (CommonMark) and avoid MDX JSX/Acorn parsing errors
   },
 
   // Set the production url of your site here
@@ -40,13 +46,26 @@ const config = {
     locales: ['vi'],
   },
 
+  stylesheets: [
+    {
+      href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
+      type: 'text/css',
+      integrity:
+        'sha384-odtC+0UGzz0/zFqN++lRoEbIo04VsrGQwREhcsbO06r9+Ocg+aKQ7LktvkGUXFI',
+      crossorigin: 'anonymous',
+    },
+  ],
+
   presets: [
     [
       'classic',
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          routeBasePath: '/',
           sidebarPath: './sidebars.js',
+          remarkPlugins: [remarkMath],
+          rehypePlugins: [rehypeKatex],
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
@@ -54,6 +73,8 @@ const config = {
         },
         blog: {
           showReadingTime: true,
+          remarkPlugins: [remarkMath],
+          rehypePlugins: [rehypeKatex],
           feedOptions: {
             type: ['rss', 'atom'],
             xslt: true,
@@ -110,7 +131,7 @@ const config = {
             items: [
               {
                 label: 'Lý thuyết',
-                to: '/docs/CHUONG_1_TONG_QUAN_CDL_GT',
+                to: '/',
               },
             ],
           },
