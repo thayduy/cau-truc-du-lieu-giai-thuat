@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkcau_truc_du_lieu_giai_thuat=self.webpackChunkcau_truc_du_lieu_giai_thuat||[]).push([["287"],{6071(t){t.exports=JSON.parse('{"metadata":{"permalink":"/cau-truc-du-lieu-giai-thuat/blog","page":1,"postsPerPage":10,"totalPages":1,"totalCount":0,"blogDescription":"Blog","blogTitle":"Blog"}}')}}]);
