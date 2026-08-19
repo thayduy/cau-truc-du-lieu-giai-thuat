@@ -32,7 +32,23 @@
      3.3.3. Sắp xếp danh sách
 3.4. Một số DSLK khác
      3.4.1. DSLK kép
+            A. Vì sao cần kép? Định nghĩa
+            B. Tổ chức DNODE / DLIST, bất biến
+            C. Dựng list và duyệt hai chiều
+            D. Thêm đầu / thêm cuối
+            E. Thêm sau / thêm trước / thêm tại vị trí
+            F. Xóa nút đang cầm, xóa đầu, xóa cuối, xóa giá trị
+            G. So sánh đơn–kép, ưu nhược, bẫy
+            H. Ứng dụng: Back/Forward, Undo/Redo, LRU, deque
      3.4.2. DSLK vòng
+            A. Vì sao cần vòng? Tổ chức chỉ giữ pTail
+            B. Duyệt vòng (do-while) — không còn NULL
+            C. Thêm đầu / thêm cuối (cùng 2 phép, khác pTail)
+            D. Xóa đầu / xóa cuối / xóa giá trị / hủy
+            E. Vòng kép
+            F. Ứng dụng: round-robin, playlist, Josephus
+            G. Ưu nhược, chọn loại
+            H. Bảng bốn loại đơn / kép / vòng / vòng kép
 ```
 
 > **Lưu ý cài đặt:** Phần 3.1 dùng C để thấy rõ `malloc`/`free` (bản chất con trỏ). Từ mục 3.3 trở đi dùng **C++** theo đúng mẫu giáo trình thực hành và đề thi: `NODE`, `LIST`, `pHead`, `pTail`, `pNext`. Con trỏ trong C và C++ là **cùng một ý tưởng**.
@@ -45,7 +61,7 @@
 |-----|---------|--------------------------------|
 | **Nền** | 3.1 → 3.2 | Vẽ được ô nhớ của `int *p = &a` và nói được DSLK khác mảng chỗ nào |
 | **Trọng tâm đề thi** | 3.3.1 → 3.3.2 → 3.3.3.A + 3.3.3.D | Tự viết `ThemDau`, `ThemCuoi`, `XoaDau`, `XoaCuoi`, `SapXep` (đổi chỗ trực tiếp), `Noi` không nhìn tài liệu |
-| **Mở rộng chương** | 3.4 | Phân biệt đơn / kép / vòng, vẽ được sơ đồ thêm-xóa |
+| **Mở rộng chương** | 3.4.1 → 3.4.2 | Vẽ thêm/xóa kép (sửa đủ 4 liên kết); duyệt vòng bằng `do-while`; Josephus $n=5,k=2$ |
 | **Cao cấp** | 3.5 → 3.6 | Chỉ học khi đã code được 3.3; không cần thuộc để qua môn |
 
 Mỗi thao tác cơ bản được viết theo một khuôn: **ý tưởng → sơ đồ trước/sau → mã giả → code → độ phức tạp → bẫy**. Gặp chỗ đánh **(nâng cao)** thì có thể bỏ qua lần đọc đầu.
@@ -58,10 +74,13 @@ Mỗi thao tác cơ bản được viết theo một khuôn: **ý tưởng → s
 |----------------------|------------------|---------------|
 | **DSLK** | Danh sách liên kết | Dãy nút nắm tay nhau bằng con trỏ |
 | **Nút / NODE** | Một phần tử của DSLK | Gồm `data` + con trỏ liên kết |
-| **`pHead`** | Con trỏ đầu danh sách | Cửa vào duy nhất của DSLK đơn |
-| **`pTail`** | Con trỏ cuối danh sách | Để thêm cuối $O(1)$ |
+| **`pHead`** | Con trỏ đầu danh sách | Cửa vào của DSLK thẳng |
+| **`pTail`** | Con trỏ cuối danh sách | Thêm cuối $O(1)$; **vòng đơn chỉ cần `pTail`** (`head = pTail->pNext`) |
 | **`pNext` / `pPrev`** | Con trỏ nút sau / nút trước | Đơn chỉ có `pNext`; kép có cả hai |
-| **`NULL`** | Không trỏ tới ô nhớ nào | Lính canh: hết danh sách (DSLK thẳng) |
+| **`NULL`** | Không trỏ tới ô nhớ nào | Lính canh hết list **thẳng**; vòng **không còn** `NULL` |
+| **DSLK kép** | Mỗi nút hai chiều | Đi lùi, xóa nút đang cầm, xóa cuối — $O(1)$ |
+| **DSLK vòng** | Đuôi nắm đầu | Dữ liệu tuần hoàn; duyệt bằng `do-while` |
+| **Bất biến** | Điều luôn đúng sau mọi thao tác | Kép: hai chiều khớp; vòng: `pTail->pNext` là head |
 | **Cấp phát tuần tự** | Lưu bằng mảng, ô nhớ kề nhau | Có `a[i]` |
 | **Cấp phát liên kết** | Mỗi nút tự “ôm” địa chỉ nút kế | Không có `a[i]` |
 | **Heap** | Vùng nhớ xin bằng `new`/`malloc` | Node sống đến khi `delete`/`free` |
@@ -2244,175 +2263,438 @@ $O(n)$. Một cặp lệch là đủ kết luận “chưa sort”.
 
 ## 3.4. MỘT SỐ DSLK KHÁC
 
-DSLK đơn đủ cho gần hết bài tập. Nó còn **hai hạn chế**, mỗi hạn chế sinh ra một biến thể:
+DSLK đơn (mục 3.3) đủ cho gần hết bài tập và đề thi. Nó còn **hai hạn chế**, mỗi hạn chế sinh ra một biến thể:
 
-| Hạn chế của DSLK đơn | Biến thể giải quyết |
-|----------------------|---------------------|
-| Không đi lùi; xóa cuối $O(n)$; thêm trước một nút $O(n)$ | **DSLK kép** — thêm `pPrev` |
-| Không mô tả dữ liệu tuần hoàn; duyệt phải luôn bắt đầu từ head | **DSLK vòng** — nút cuối trỏ về đầu |
+| Hạn chế của DSLK đơn | Hệ quả cụ thể | Biến thể giải quyết |
+|----------------------|---------------|---------------------|
+| Mỗi nút **chỉ biết nút sau** (`pNext`) | Không đi lùi; xóa cuối $O(n)$; thêm/xóa **trước** một nút đang cầm phải duyệt lại từ `pHead` | **DSLK kép** — thêm `pPrev` |
+| Nút cuối trỏ `NULL` — list **thẳng**, có điểm dừng | Không mô tả dữ liệu tuần hoàn; muốn “đi hết một vòng rồi quay lại” phải tự nhảy về `pHead` | **DSLK vòng** — nút cuối trỏ về đầu |
 
-Học kép trước (vẫn thẳng, thêm một con trỏ), rồi vòng (đổi điều kiện dừng).
+**Lộ trình học 3.4** (đừng nhảy cóc):
+
+```
+3.4.1 kép   =  DSLK đơn + một con trỏ ngược   (vẫn thẳng, vẫn có NULL)
+3.4.2 vòng  =  đổi điều kiện dừng              (đuôi nắm đầu, không còn NULL)
+vòng kép    =  ghép cả hai ý trên
+```
+
+Khuôn mỗi thao tác **giống 3.3**: ý tưởng → sơ đồ trước/sau → mã giả → code → $O$ → bẫy.
+
+> Học kép trước vì cấu trúc nút đổi, nhưng điều kiện duyệt vẫn là `p != NULL`. Học vòng sau vì cấu trúc nút **không đổi** so với đơn, nhưng điều kiện duyệt đổi hẳn — chỗ này dễ vòng lặp vô hạn nếu hấp tấp.
+
+---
 
 ### 3.4.1. DSLK kép (Doubly Linked List)
 
-#### A. Định nghĩa
+#### A. Vì sao cần kép? Định nghĩa
 
-Mỗi nút có **hai** liên kết:
+**Ẩn dụ.** DSLK đơn như hàng người **chỉ nắm vai người phía trước**: biết ai đứng sau, không biết ai đứng trước. Muốn xóa người cuối, phải đi từ đầu hàng hỏi từng người “bạn có phải người áp chót không?”.
 
-- `pNext` — nút sau (cột phải)
-- `pPrev` — nút trước (cột trái)
+DSLK kép như hàng người **nắm hai tay**: tay phải nắm người sau (`pNext`), tay trái nắm người trước (`pPrev`). Đứng ở bất kỳ chỗ nào cũng bước tới **hoặc** bước lùi được một bước.
+
+**Định nghĩa.** Danh sách liên kết kép là danh sách liên kết trong đó **mỗi nút** chứa:
+
+1. `data` — thông tin.
+2. `pNext` — địa chỉ nút đứng **sau** (giống DSLK đơn).
+3. `pPrev` — địa chỉ nút đứng **trước** (điểm mới).
+
+Hai đầu danh sách thẳng vẫn kết thúc bằng `NULL`:
+
+- Nút **đầu**: `pPrev = NULL` (không có ai đứng trước).
+- Nút **cuối**: `pNext = NULL` (không có ai đứng sau).
 
 ```
-  pHead                                         pTail
-    │                                             │
-    ▼                                             ▼
- ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │──► NULL
- └────┴────┴────┘   └─▲──┴────┴────┘   └─▲──┴────┴────┘
-    ▲    prev data next  │                  │
-    └────────────────────┴──────────────────┘
-                    pPrev đi ngược
+      pHead                                              pTail
+        │                                                  │
+        ▼                                                  ▼
+   ┌────┬────┬────┐     ┌────┬────┬────┐     ┌────┬────┬────┐
+   │ /  │ 10 │  ●─┼────►│  ● │ 20 │  ●─┼────►│  ● │ 30 │  / │────► NULL
+   │    │    │    │◄────┼─●  │    │    │◄────┼─●  │    │    │
+   └────┴────┴────┘     └────┴────┴────┘     └────┴────┴────┘
+     prev data next       prev data next       prev data next
+     ▲
+     └── NULL (không có nút trước 10)
 
- NULL◄── prev của 10     next của 30 ──► NULL
- Nếu 10.next == 20  thì bắt buộc  20.prev == 10
+ Quy ước vẽ xuyên 3.4.1:
+   cột trái  = pPrev     cột giữa = data     cột phải = pNext
+   mũi tên ──► đi xuôi     mũi tên ◄── đi ngược
+   /  nghĩa là NULL
 ```
+
+**Quy tắc đối xứng (thuộc lòng):**
+
+```
+Nếu  A.pNext = B     thì bắt buộc     B.pPrev = A
+Nếu  B.pPrev = A     thì bắt buộc     A.pNext = B
+```
+
+Một chiều đứt, chiều kia còn → list **hỏng**, duyệt xuôi ra một thứ, duyệt ngược ra thứ khác. Đây là nguồn bug số 1 của DSLK kép.
+
+**Ba việc DSLK đơn làm kém, kép làm tốt:**
+
+| Việc | DSLK đơn (đã cầm con trỏ tới nút) | DSLK kép |
+|------|-----------------------------------|----------|
+| Đi lùi một bước | Không — phải duyệt lại từ `pHead` | `p = p->pPrev` — $O(1)$ |
+| Xóa **chính nút đang cầm** | Phải tìm nút trước → $O(n)$ | Sửa 2 liên kết → $O(1)$ |
+| Xóa cuối (có `pTail`) | Phải tìm nút áp chót → $O(n)$ | `pTail->pPrev` chính là áp chót → $O(1)$ |
+
+Giá phải trả: mỗi nút thêm **một con trỏ**; mỗi thao tác sửa **nhiều liên kết hơn**.
+
+---
+
+#### B. Tổ chức `DNODE` / `DLIST` và bất biến
+
+Khai báo **cùng phong cách** `NODE` / `LIST` của mục 3.3, chỉ thêm `pPrev`. Tên `DNODE`/`DLIST` để khỏi lẫn với đơn khi cả hai cùng nằm trong một file.
 
 ```cpp
 struct DNODE {
     int data;
-    DNODE* pPrev;
-    DNODE* pNext;
+    DNODE* pPrev;    // nut dung truoc — NULL neu la dau
+    DNODE* pNext;    // nut dung sau  — NULL neu la cuoi
 };
 
 struct DLIST {
     DNODE* pHead;
     DNODE* pTail;
 };
+```
 
+```
+ struct DNODE                         struct DLIST
+ ┌──────┬──────┬──────┐               ┌────────┬────────┐
+ │pPrev │ data │pNext │               │ pHead  │ pTail  │
+ └──────┴──────┴──────┘               └────────┴────────┘
+     ▲       ▲      ▲                      │         │
+     │       │      └── giống DSLK đơn     │         └──► nút cuối
+     │       └── thông tin                 └──────────► nút đầu
+     └── CHỈ CÓ Ở KÉP
+```
+
+**Khởi tạo rỗng** và **tạo nút** — nút mới đứng một mình: cả hai con trỏ đều `NULL`.
+
+```
+THUẬT TOÁN KhoiTaoD(l)
+1. l.pHead ← NULL
+2. l.pTail ← NULL
+
+THUẬT TOÁN TaoDNode(x) → p
+1. p ← cấp phát một DNODE
+2. p.data  ← x
+3. p.pPrev ← NULL
+4. p.pNext ← NULL
+5. Trả về p
+```
+
+```cpp
 void KhoiTaoD(DLIST &l) {
     l.pHead = l.pTail = NULL;
+}
+
+bool IsEmptyD(DLIST l) {
+    return l.pHead == NULL;
 }
 
 DNODE* TaoDNode(int x) {
     DNODE* p = new DNODE;
     p->data  = x;
-    p->pPrev = p->pNext = NULL;
+    p->pPrev = p->pNext = NULL;   // nut moi chua noi ai, chua ai noi
     return p;
 }
 ```
 
-**Bất biến (invariant) phải giữ mọi lúc:**
+```
+  TaoDNode(10) trả về p:
 
-1. `pHead->pPrev == NULL` (nếu list không rỗng).
-2. `pTail->pNext == NULL`.
-3. Nếu `a->pNext == b` thì `b->pPrev == a` (liên kết đối xứng).
-4. Rỗng: `pHead == pTail == NULL`.
+    p
+    │
+    ▼
+ ┌────┬────┬────┐
+ │ /  │ 10 │  / │     ← hộp đứng một mình
+ └────┴────┴────┘
+  prev data next
+```
 
-#### B. Duyệt hai chiều
+**Bốn bất biến (invariant) — phải đúng sau MỌI thao tác:**
+
+| # | Bất biến | Ý nghĩa |
+|---|----------|---------|
+| 1 | Rỗng ⇔ `pHead == NULL` **và** `pTail == NULL` | Không được một bên NULL, một bên còn trỏ |
+| 2 | Nếu không rỗng: `pHead->pPrev == NULL` | Đầu không có người trước |
+| 3 | Nếu không rỗng: `pTail->pNext == NULL` | Cuối không có người sau |
+| 4 | Với mọi cặp kề: `a->pNext == b` ⇔ `b->pPrev == a` | Hai chiều luôn khớp |
+
+Hàm kiểm tra (dùng khi debug, không cần thuộc để thi):
+
+```cpp
+bool HopLeKep(DLIST l) {
+    if (l.pHead == NULL)
+        return l.pTail == NULL;          // bat bien 1
+    if (l.pTail == NULL) return false;
+    if (l.pHead->pPrev != NULL) return false;   // bat bien 2
+    if (l.pTail->pNext != NULL) return false;   // bat bien 3
+
+    DNODE* p = l.pHead;
+    while (p->pNext != NULL) {
+        if (p->pNext->pPrev != p) return false; // bat bien 4
+        p = p->pNext;
+    }
+    return p == l.pTail;                 // di xuoi phai dung dung pTail
+}
+```
+
+**Quy tắc vàng khi sửa kép:** mỗi lần “cắt–nối”, hãy hỏi: *mình đã sửa đủ cả hai phía của mỗi mối nối chưa?* Một mối nối $A \leftrightarrow B$ cần **hai** phép gán: `A->pNext = B` **và** `B->pPrev = A`.
+
+---
+
+#### C. Dựng list và duyệt hai chiều
+
+**Dựng `[10]↔[20]↔[30]` bằng thêm cuối** — nhìn từng bước để thuộc `pHead`/`pTail`.
+
+**Bước 0 — rỗng:**
+
+```
+ pHead ──► NULL     pTail ──► NULL
+```
+
+**Bước 1 — thêm 10** (list rỗng: đầu = cuối = nút mới, hai con trỏ vẫn `NULL`):
+
+```
+      pHead, pTail
+           │
+           ▼
+      ┌────┬────┬────┐
+      │ /  │ 10 │  / │──► NULL
+      └────┴────┴────┘
+```
+
+**Bước 2 — thêm 20** (nối hai chiều giữa 10 và 20, dời `pTail`):
+
+```
+      pHead              pTail
+        │                  │
+        ▼                  ▼
+   ┌────┬────┬────┐   ┌────┬────┬────┐
+   │ /  │ 10 │  ●─┼──►│  ● │ 20 │  / │──► NULL
+   │    │    │    │◄──┼─●  │    │    │
+   └────┴────┴────┘   └────┴────┴────┘
+```
+
+**Bước 3 — thêm 30:**
+
+```
+      pHead                                 pTail
+        │                                     │
+        ▼                                     ▼
+   ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
+   │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │──► NULL
+   │    │    │    │◄──┼─●  │    │    │◄──┼─●  │    │    │
+   └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+```
+
+Trên RAM ba nút **không** cần liền kề. Logic 10↔20↔30 nhờ **hai** con trỏ mỗi cặp, không nhờ địa chỉ tăng dần.
+
+---
+
+**Duyệt xuôi** — giống DSLK đơn, từ `pHead` theo `pNext` đến `NULL`.
+
+**Duyệt ngược** — việc đơn **không làm được** (trừ khi dùng stack phụ): từ `pTail` theo `pPrev` đến `NULL`.
+
+```
+THUẬT TOÁN XuatXuoi(l)
+1. p ← l.pHead
+2. while p ≠ NULL
+3.     in p.data
+4.     p ← p.pNext
+
+THUẬT TOÁN XuatNguoc(l)
+1. p ← l.pTail
+2. while p ≠ NULL
+3.     in p.data
+4.     p ← p.pPrev
+```
 
 ```cpp
 void XuatXuoi(DLIST l) {
+    cout << "Xuoi : ";
     for (DNODE* p = l.pHead; p != NULL; p = p->pNext)
         cout << p->data << " ";
     cout << "\n";
 }
 
 void XuatNguoc(DLIST l) {
+    cout << "Nguoc: ";
     for (DNODE* p = l.pTail; p != NULL; p = p->pPrev)
         cout << p->data << " ";
     cout << "\n";
 }
+
+int DemSoPhanTuKep(DLIST l) {
+    int dem = 0;
+    for (DNODE* p = l.pHead; p != NULL; p = p->pNext)
+        dem++;
+    return dem;
+}
+
+DNODE* TimKep(DLIST l, int x) {
+    for (DNODE* p = l.pHead; p != NULL; p = p->pNext)
+        if (p->data == x) return p;
+    return NULL;
+}
 ```
 
-Đây là thứ DSLK đơn **làm không được** (trừ khi dùng stack phụ).
+List `[10]↔[20]↔[30]`:
+
+```
+ XuatXuoi  →  10  20  30
+ XuatNguoc →  30  20  10
+```
+
+| Thao tác | Thời gian | Không gian |
+|----------|-----------|------------|
+| Xuôi / ngược / đếm / tìm | $O(n)$ | $O(1)$ |
+
+Tìm kiếm **vẫn $O(n)$**. Có `pPrev` không giúp nhảy giữa list; không có `a[i]`.
+
+**Bẫy duyệt:**
+
+- Dùng `p->pNext != NULL` khi muốn in **mọi** nút → **bỏ nút cuối** (giống đơn).
+- Duyệt ngược nhưng xuất phát từ `pHead` rồi `p = p->pPrev` → vòng không chạy (head.prev đã `NULL`) hoặc crash nếu quên kiểm tra rỗng.
+- Tìm từ hai đầu “cho nhanh” vẫn $O(n)$ — chỉ giảm hằng số, đề thi không đòi.
 
 ---
 
-#### C. Thêm đầu — $O(1)$
+#### D. Thêm đầu / thêm cuối — cả hai $O(1)$
+
+##### ① Thêm đầu — $O(1)$
+
+**Ý tưởng.** Nút mới trở thành người đứng đầu hàng: nó nắm `pHead` cũ bằng `pNext`; `pHead` cũ nắm nó bằng `pPrev`; cửa `pHead` chuyển sang nút mới.
+
+**Trường hợp rỗng** — không có “head cũ” để sửa `pPrev`:
 
 ```
- TRƯỚC
-                pHead          pTail
-                  │              │
-                  ▼              ▼
-               ┌────┬────┬────┐   ┌────┬────┬────┐
- NULL ◄────────┤ /  │ 20 │  ●─┼──►│  ● │ 30 │  / │──► NULL
-               └────┴────┴────┘   └────┴────┴────┘
+ Trước:  pHead ──► NULL    pTail ──► NULL
 
- p (nút 10) — 4 phép, đúng thứ tự:
- ① p->pNext = pHead
- ② p->pPrev = NULL
- ③ pHead->pPrev = p     (20 nhớ người đứng trước là 10)
- ④ pHead = p
+ Sau (thêm 10):
+      pHead, pTail
+           │
+           ▼
+      ┌────┬────┬────┐
+      │ /  │ 10 │  / │
+      └────┴────┴────┘
+```
+
+**Trường hợp đã có nút** — 4 phép, **đúng thứ tự ①② rồi mới ③④**:
+
+```
+ TRƯỚC                    p (nút 10, chưa nối)
+      pHead    pTail         │
+        │        │           ▼
+        ▼        ▼        ┌────┬────┬────┐
+   ┌────┬────┬────┐  ┌────┬────┬────┐  │ /  │ 10 │  / │
+   │ /  │ 20 │  ●─┼─►│  ● │ 30 │  / │  └────┴────┴────┘
+   │    │    │    │◄─┼─●  │    │    │
+   └────┴────┴────┘  └────┴────┴────┘
+
+ ① p->pNext = pHead      (10 nắm 20 — GIỮ list cũ trước khi dời cửa)
+ ② p->pPrev = NULL       (10 là đầu mới, không ai đứng trước)
+ ③ pHead->pPrev = p      (20.prev nhớ 10 — ĐÂY LÀ PHÉP ĐƠN KHÔNG CÓ)
+ ④ pHead = p             (cửa vào chuyển sang 10)
+    pTail không đổi
 
  SAU
-  pHead                                         pTail
-    │                                             │
-    ▼                                             ▼
- ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │──► NULL
- └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+      pHead                                 pTail
+        │                                     │
+        ▼                                     ▼
+   ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
+   │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
+   │    │    │    │◄──┼─●  │    │    │◄──┼─●  │    │    │
+   └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
 ```
-
-Cần cập nhật **tới 4** liên kết: `p->pPrev`, `p->pNext`, `head cũ->pPrev`, `pHead`.
 
 **Mã giả:**
 
 ```
 THUẬT TOÁN ThemDauKep(l, p)
-1. nếu rỗng: pHead ← pTail ← p; return
-2. p.pNext ← l.pHead
-3. p.pPrev ← NULL
-4. l.pHead.pPrev ← p
-5. l.pHead ← p
+Vào: p là nút mới, pPrev = pNext = NULL
+1. nếu l.pHead = NULL
+2.     l.pHead ← p
+3.     l.pTail ← p
+4.     return
+5. p.pNext ← l.pHead
+6. p.pPrev ← NULL
+7. l.pHead.pPrev ← p      // head cũ nhớ người mới đứng trước
+8. l.pHead ← p
 ```
 
 ```cpp
 void ThemDauKep(DLIST &l, DNODE* p) {
+    if (p == NULL) return;
     if (l.pHead == NULL) {
         l.pHead = l.pTail = p;
         return;
     }
-    p->pNext = l.pHead;
-    p->pPrev = NULL;
-    l.pHead->pPrev = p;
-    l.pHead = p;
+    p->pNext = l.pHead;       // ①
+    p->pPrev = NULL;          // ②  (TaoDNode da lam, ghi lai cho ro)
+    l.pHead->pPrev = p;       // ③
+    l.pHead = p;              // ④
+}
+
+void ThemDauKepGiaTri(DLIST &l, int x) {
+    ThemDauKep(l, TaoDNode(x));
 }
 ```
 
+**Bẫy:** quên bước ③ → duyệt xuôi `10 → 20 → 30` đúng, duyệt ngược từ 20 đi về gặp `NULL` thay vì 10. “Nửa list”.  
+**Bẫy:** làm ④ trước ① → mất địa chỉ head cũ, rò rỉ cả list (giống bẫy `ThemDau` đơn).
+
+$O(1)$ — không duyệt.
+
 ---
 
-#### D. Thêm cuối — $O(1)$
+##### ② Thêm cuối — $O(1)$
 
-Đối xứng với thêm đầu: nắm `pTail` thay vì `pHead`.
+**Ý tưởng.** Đối xứng thêm đầu: nắm `pTail` thay vì `pHead`. Nút mới đứng sau người cuối; người cuối nắm nó bằng `pNext`; nó nắm người cuối bằng `pPrev`; cửa `pTail` chuyển sang nút mới.
 
 ```
  TRƯỚC
-  pHead          pTail              p (nút 30)
-    │              │                │
-    ▼              ▼                ▼
- ┌────┬────┬────┐   ┌────┬────┬────┐      ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──►│  ● │ 20 │  / │      │ /  │ 30 │  / │
- └────┴────┴────┘   └────┴────┴────┘      └────┴────┴────┘
+      pHead          pTail              p (nút 30)
+        │              │                │
+        ▼              ▼                ▼
+   ┌────┬────┬────┐   ┌────┬────┬────┐     ┌────┬────┬────┐
+   │ /  │ 10 │  ●─┼──►│  ● │ 20 │  / │     │ /  │ 30 │  / │
+   │    │    │    │◄──┼─●  │    │    │     └────┴────┴────┘
+   └────┴────┴────┘   └────┴────┴────┘
 
- ① p->pPrev = pTail
- ② p->pNext = NULL
- ③ pTail->pNext = p
- ④ pTail = p
+ ① p->pPrev = pTail      (30 nắm 20)
+ ② p->pNext = NULL       (30 là cuối mới)
+ ③ pTail->pNext = p      (20 nắm 30)
+ ④ pTail = p             (cửa cuối chuyển sang 30)
 
  SAU
-  pHead                                         pTail
-    │                                             │
-    ▼                                             ▼
- ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │──► NULL
- └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+      pHead                                 pTail
+        │                                     │
+        ▼                                     ▼
+   ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
+   │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
+   │    │    │    │◄──┼─●  │    │    │◄──┼─●  │    │    │
+   └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
 ```
 
-Bốn phép: `p->pPrev = tail`, `p->pNext = NULL`, `tail->pNext = p`, `pTail = p`.
+```
+THUẬT TOÁN ThemCuoiKep(l, p)
+1. nếu l.pTail = NULL
+2.     l.pHead ← p
+3.     l.pTail ← p
+4.     return
+5. p.pPrev ← l.pTail
+6. p.pNext ← NULL
+7. l.pTail.pNext ← p
+8. l.pTail ← p
+```
 
 ```cpp
 void ThemCuoiKep(DLIST &l, DNODE* p) {
+    if (p == NULL) return;
     if (l.pTail == NULL) {
         l.pHead = l.pTail = p;
         return;
@@ -2424,91 +2706,257 @@ void ThemCuoiKep(DLIST &l, DNODE* p) {
 }
 ```
 
+**Nhìn đối xứng** để nhớ, đừng học vẹt hai hàm rời:
+
+| | Thêm đầu | Thêm cuối |
+|--|----------|-----------|
+| Nút mới nắm phía list | `p->pNext = pHead` | `p->pPrev = pTail` |
+| Nút mới phía còn lại | `p->pPrev = NULL` | `p->pNext = NULL` |
+| Nút cũ nhớ nút mới | `pHead->pPrev = p` | `pTail->pNext = p` |
+| Dời cửa | `pHead = p` | `pTail = p` |
+
+$O(1)$ với `pTail`. Không có `pTail` thì thêm cuối vẫn $O(n)$ — phải đi đến nút có `pNext == NULL`.
+
 ---
 
-#### E. Thêm sau nút `q` — $O(1)$
+#### E. Thêm sau / thêm trước / thêm tại vị trí
+
+##### ③ Thêm sau nút `q` — $O(1)$ nếu đã cầm `q`
+
+**Ý tưởng.** Chèn `p` vào khe giữa `q` và `q->pNext`. Bốn mối nối: $q \leftrightarrow p$ và $p \leftrightarrow$ (nút sau cũ). Nếu `q` đang là tail thì không có nút sau → `p` thành tail mới.
 
 ```
- TRƯỚC  q cầm 20, thêm p=25
- ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
- └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
-                      q
+ TRƯỚC   q cầm 20, thêm p = 25
+      ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
+      │    │    │    │◄──┼─●  │    │    │◄──┼─●  │    │    │
+      └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+                           q
 
- ① p->pNext = q->pNext     (25 nắm 30)
- ② p->pPrev = q            (25.prev = 20)
- ③ q->pNext = p            (20 nắm 25)
- ④ p->pNext->pPrev = p     (30.prev = 25)  — nếu p->pNext == NULL thì pTail = p
+ Thứ tự BẮT BUỘC — giữ 30 trước khi cắt 20.next:
+ ① p->pNext = q->pNext      (25 nắm 30)
+ ② p->pPrev = q             (25.prev = 20)
+ ③ q->pNext = p             (20 nắm 25)
+ ④ nếu p->pNext ≠ NULL
+       p->pNext->pPrev = p  (30.prev = 25)
+    ngược lại
+       pTail = p            (q là tail cũ, 25 thành đuôi)
 
  SAU
- ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼─►│  ● │ 20 │  ●─┼─►│  ● │ 25 │  ●─┼─►│  ● │ 30 │  / │
- └────┴────┴────┘  └────┴────┴────┘  └────┴────┴────┘  └────┴────┴────┘
+      ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼─►│  ● │ 20 │  ●─┼─►│  ● │ 25 │  ●─┼─►│  ● │ 30 │  / │
+      │    │    │    │◄─┼─●  │    │    │◄─┼─●  │    │    │◄─┼─●  │    │    │
+      └────┴────┴────┘  └────┴────┴────┘  └────┴────┴────┘  └────┴────┴────┘
+                          q                 p
+```
+
+```
+THUẬT TOÁN ThemSauKep(l, q, p)
+Vào: q ≠ NULL, p là nút mới
+1. p.pNext ← q.pNext
+2. p.pPrev ← q
+3. q.pNext ← p
+4. nếu p.pNext ≠ NULL
+5.     p.pNext.pPrev ← p
+6. ngược lại
+7.     l.pTail ← p
 ```
 
 ```cpp
 void ThemSauKep(DLIST &l, DNODE* q, DNODE* p) {
-    if (q == NULL) return;
+    if (q == NULL || p == NULL) return;
     p->pNext = q->pNext;
     p->pPrev = q;
     q->pNext = p;
     if (p->pNext != NULL)
         p->pNext->pPrev = p;
     else
-        l.pTail = p;          // q la tail cu
+        l.pTail = p;
 }
 ```
 
-Thêm **trước** `q`: $O(1)$ — đây là thắng lợi so với DSLK đơn.
+**Bẫy:** làm ③ trước ① → mất địa chỉ 30, không gán được ④, đứt đuôi.  
+**Bẫy:** quên nhánh `else pTail = p` khi chèn sau tail → `pTail` còn trỏ 20, xuất xuôi in được 25 nhưng các hàm dựa vào `pTail` (thêm cuối, xóa cuối, xuất ngược) sai.
+
+---
+
+##### ④ Thêm **trước** nút `q` — $O(1)$  ← thắng lợi so với đơn $O(n)$
+
+**Ý tưởng.** DSLK đơn không có `pPrev` nên phải **tìm** nút đứng trước `q` ($O(n)$). Kép đã cầm `q->pPrev` sẵn: thêm trước `q` = thêm sau `q->pPrev`. Nếu `q` là head thì gọi `ThemDauKep`.
+
+```
+ TRƯỚC   q cầm 20, thêm p = 15  (chèn giữa 10 và 20)
+      ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
+      └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+         q->pPrev              q
+
+  q không phải head  →  ThemSauKep(l, q->pPrev, p)
+  tức là ThemSau(10, 15)
+
+ SAU
+      ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼─►│  ● │ 15 │  ●─┼─►│  ● │ 20 │  ●─┼─►│  ● │ 30 │  / │
+      └────┴────┴────┘  └────┴────┴────┘  └────┴────┴────┘  └────┴────┴────┘
+```
+
+```
+THUẬT TOÁN ThemTruocKep(l, q, p)
+1. nếu q = NULL thì return
+2. nếu q = l.pHead thì ThemDauKep(l, p); return
+3. ThemSauKep(l, q.pPrev, p)
+```
 
 ```cpp
 void ThemTruocKep(DLIST &l, DNODE* q, DNODE* p) {
-    if (q == NULL) return;
-    if (q == l.pHead) { ThemDauKep(l, p); return; }
+    if (q == NULL || p == NULL) return;
+    if (q == l.pHead) {
+        ThemDauKep(l, p);
+        return;
+    }
     ThemSauKep(l, q->pPrev, p);
 }
 ```
 
+Có thể viết bung 4 phép (đối xứng `ThemSauKep`) nếu đề thi bắt “không gọi hàm khác”:
+
+```
+ p.pPrev ← q.pPrev
+ p.pNext ← q
+ q.pPrev.pNext ← p     // 10 nắm 15  (an toàn vì q không phải head)
+ q.pPrev ← p           // 20.prev = 15
+```
+
+**Phân tích:** tìm `q` nếu chỉ biết giá trị vẫn $O(n)$; **chèn** khi đã cầm `q` mới là $O(1)$. Đề bài “thêm trước nút có data = x” = tìm $O(n)$ + chèn $O(1)$.
+
 ---
 
-#### F. Xóa một nút `p` cho trước — $O(1)$ (không cần tìm nút trước)
-
-Đây là lý do DSLK kép tồn tại.
+##### ⑤ Thêm tại vị trí $k$ (đếm từ 0)
 
 ```
- Xóa nút 20 (đã cầm sẵn con trỏ p):
+THUẬT TOÁN ThemTaiViTriKep(l, k, p)
+1. nếu k ≤ 0 thì ThemDauKep(l, p); return
+2. q ← l.pHead; i ← 0
+3. while q ≠ NULL và i < k - 1
+4.     q ← q.pNext; i ← i + 1
+5. nếu q = NULL thì ThemCuoiKep(l, p)     // k vượt độ dài
+6. ngược lại ThemSauKep(l, q, p)
+```
 
- TRƯỚC
- ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
- └────┴────┴────┘   └─▲──┴────┴────┘   └─▲──┴────┴────┘
-                      p
+```cpp
+void ThemTaiViTriKep(DLIST &l, int k, DNODE* p) {
+    if (p == NULL) return;
+    if (k <= 0 || l.pHead == NULL) {
+        ThemDauKep(l, p);
+        return;
+    }
+    DNODE* q = l.pHead;
+    int i = 0;
+    while (q != NULL && i < k - 1) {
+        q = q->pNext;
+        i++;
+    }
+    if (q == NULL)
+        ThemCuoiKep(l, p);
+    else
+        ThemSauKep(l, q, p);
+}
+```
 
- Hai phép giữa (p không phải head/tail):
- ①  p->pPrev->pNext = p->pNext     (10.next ← 30)
- ②  p->pNext->pPrev = p->pPrev     (30.prev ← 10)
-     delete p
+Tìm vị trí $O(k)$, chèn $O(1)$ → tổng $O(n)$ xấu nhất. Kép **không** làm `ThemTaiViTri` xuống $O(1)$ — vẫn phải đi bộ tới chỗ $k$.
+
+---
+
+#### F. Xóa — lý do kép tồn tại
+
+##### ⑥ Xóa một nút `p` **đang cầm sẵn** — $O(1)$
+
+**Ý tưởng.** Nút trước `p` và nút sau `p` nắm lấy nhau, bỏ `p` ra khỏi chuỗi, rồi `delete p`. Không cần tìm nút trước (đơn bắt buộc phải tìm).
+
+Bốn nhánh, **vẽ trên giấy trước khi gõ**:
+
+| Nhánh | Nhận ra bằng | Việc làm |
+|-------|----------------|----------|
+| List 1 nút | `p == pHead && p == pTail` | `pHead = pTail = NULL` |
+| Xóa đầu | `p == pHead` | `pHead = p->pNext`; `pHead->pPrev = NULL` |
+| Xóa cuối | `p == pTail` | `pTail = p->pPrev`; `pTail->pNext = NULL` |
+| Xóa giữa | còn lại | `p->pPrev->pNext = p->pNext`; `p->pNext->pPrev = p->pPrev` |
+
+**Xóa giữa** (minh họa chính):
+
+```
+ TRƯỚC  xóa nút 20 (đã cầm p)
+      ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  / │
+      │    │    │    │◄──┼─●  │    │    │◄──┼─●  │    │    │
+      └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+                           p
+
+ ① p->pPrev->pNext = p->pNext     (10.next ← 30)
+ ② p->pNext->pPrev = p->pPrev     (30.prev ← 10)
+    delete p
 
  SAU
- ┌────┬────┬────┐                   ┌────┬────┬────┐
- │ /  │ 10 │  ●─┼──────────────────►│  ● │ 30 │  / │
- └────┴────┴────┘                   └────┴────┴────┘
+      ┌────┬────┬────┐                     ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼────────────────────►│  ● │ 30 │  / │
+      │    │    │    │◄────────────────────┼─●  │    │    │
+      └────┴────┴────┘                     └────┴────┴────┘
+        pHead                                pTail
 ```
 
-Chỉ cần:
+**Xóa đầu** (list ≥ 2 nút):
 
 ```
-p.pPrev.pNext ← p.pNext
-p.pNext.pPrev ← p.pPrev
+ TRƯỚC  p = pHead = 10
+      ┌────┬────┬────┐   ┌────┬────┬────┐
+      │ /  │ 10 │  ●─┼──►│  ● │ 20 │  ...
+      └────┴────┴────┘   └────┴────┴────┘
+
+  pHead = 20
+  pHead->pPrev = NULL     // 20 không còn nhớ 10
+  delete 10
+
+ SAU
+      pHead
+        │
+        ▼
+   ┌────┬────┬────┐
+   │ /  │ 20 │  ...
+   └────┴────┴────┘
 ```
 
-kèm xử lý nếu `p` là head hoặc tail.
+**Xóa cuối** — đối xứng, $O(1)$ (đơn phải $O(n)$):
+
+```
+ TRƯỚC  p = pTail = 30, list 10↔20↔30
+
+  pTail = 20              // p->pPrev
+  pTail->pNext = NULL     // 20 không còn nắm 30
+  delete 30
+```
+
+```
+THUẬT TOÁN XoaNodeKep(l, p)
+1. nếu p = NULL hoặc list rỗng thì return
+2. nếu p là head VÀ tail          // 1 nút
+3.     pHead ← pTail ← NULL
+4. ngược lại nếu p là head
+5.     pHead ← p.pNext
+6.     pHead.pPrev ← NULL
+7. ngược lại nếu p là tail
+8.     pTail ← p.pPrev
+9.     pTail.pNext ← NULL
+10. ngược lại
+11.    p.pPrev.pNext ← p.pNext
+12.    p.pNext.pPrev ← p.pPrev
+13. delete p
+```
 
 ```cpp
 void XoaNodeKep(DLIST &l, DNODE* p) {
     if (p == NULL || l.pHead == NULL) return;
 
-    if (p == l.pHead && p == l.pTail) {     // 1 nut
+    if (p == l.pHead && p == l.pTail) {
         l.pHead = l.pTail = NULL;
     } else if (p == l.pHead) {
         l.pHead = p->pNext;
@@ -2523,72 +2971,267 @@ void XoaNodeKep(DLIST &l, DNODE* p) {
     delete p;
 }
 
-void XoaDauKep(DLIST &l) { XoaNodeKep(l, l.pHead); }
+void XoaDauKep(DLIST &l)  { XoaNodeKep(l, l.pHead); }
 void XoaCuoiKep(DLIST &l) { XoaNodeKep(l, l.pTail); }   // O(1) !
+```
 
+**Bẫy thứ tự `if`:** phải xét **1 nút trước** xóa đầu/cuối. Nếu viết `if (p == pHead) { pHead = p->pNext; pHead->pPrev = NULL; }` khi list 1 nút thì `pHead` thành `NULL` rồi `NULL->pPrev` → crash.
+
+**Bẫy:** `delete p` rồi còn dùng `p->pNext` → dangling pointer.
+
+**Bẫy:** xóa giữa mà chỉ sửa `pPrev->pNext`, quên `pNext->pPrev` → xuất xuôi đúng, xuất ngược đứt.
+
+Xóa đầu / xóa cuối **khi đã có con trỏ** là $O(1)$. Xóa theo **giá trị** vẫn phải tìm trước.
+
+---
+
+##### ⑦ Xóa theo giá trị (nút đầu tiên có `data == x`) — $O(n)$
+
+Tìm $O(n)$ + xóa nút đang cầm $O(1)$.
+
+```cpp
+void XoaGiaTriKep(DLIST &l, int x) {
+    DNODE* p = TimKep(l, x);
+    if (p != NULL)
+        XoaNodeKep(l, p);
+}
+
+void XoaTaiViTriKep(DLIST &l, int k) {
+    if (k < 0) return;
+    DNODE* p = l.pHead;
+    int i = 0;
+    while (p != NULL && i < k) {
+        p = p->pNext;
+        i++;
+    }
+    if (p != NULL)
+        XoaNodeKep(l, p);
+}
+```
+
+---
+
+##### ⑧ Hủy toàn bộ — chống memory leak
+
+```cpp
 void HuyDanhSachKep(DLIST &l) {
     while (l.pHead != NULL)
         XoaDauKep(l);
 }
 ```
 
-**Xóa cuối $O(1)$** — khác hẳn DSLK đơn $O(n)$. Bốn nhánh `if` tương ứng: 1 nút / xóa đầu / xóa cuối / xóa giữa. Vẽ trên giấy trước khi gõ: luôn sửa **cả hai phía** `pPrev` và `pNext`.
+$O(n)$. Mỗi `XoaDauKep` là $O(1)$, lặp $n$ lần. Sau hàm: `pHead == pTail == NULL`.
 
-**So nhanh đơn vs kép:**
+Có thể viết tay không gọi `XoaDauKep`: giữ `pNext` trước khi `delete`, vì sau `delete` không được đọc `p->pNext`.
 
-| Thao tác (đã cầm con trỏ tới nút) | DSLK đơn | DSLK kép |
-|-----------------------------------|----------|----------|
-| Thêm/xóa đầu | $O(1)$ | $O(1)$ |
-| Thêm cuối (có tail) | $O(1)$ | $O(1)$ |
-| Xóa cuối (có tail) | $O(n)$ | **$O(1)$** |
-| Thêm/xóa trước một nút | $O(n)$ | **$O(1)$** |
-| Duyệt ngược | Không | Có |
-| RAM mỗi nút | 1 con trỏ | 2 con trỏ |
+```cpp
+void HuyDanhSachKep2(DLIST &l) {
+    DNODE* p = l.pHead;
+    while (p != NULL) {
+        DNODE* t = p->pNext;
+        delete p;
+        p = t;
+    }
+    l.pHead = l.pTail = NULL;
+}
+```
 
 ---
 
-#### G. Ưu / nhược điểm DSLK kép
+##### ⑨ Ví dụ chạy tay cả chuỗi (kép)
+
+List rỗng. Thực hiện: `ThemCuoi 20`, `ThemDau 10`, `ThemCuoi 40`, `ThemSau(20, 30)`, `XoaCuoi`, `XoaNode(20)`.
+
+```
+ 0. rỗng
+ 1. ThemCuoi 20     →  [20]
+ 2. ThemDau 10      →  [10]↔[20]
+ 3. ThemCuoi 40     →  [10]↔[20]↔[40]
+ 4. ThemSau(20,30)  →  [10]↔[20]↔[30]↔[40]
+ 5. XoaCuoi         →  [10]↔[20]↔[30]     (O(1), đơn phải đi tìm 20)
+ 6. XoaNode(20)     →  [10]↔[30]           (O(1), đơn phải đi tìm 10)
+ XuatXuoi  = 10 30
+ XuatNguoc = 30 10
+```
+
+---
+
+#### G. So sánh đơn–kép, ưu nhược, bẫy
+
+**Bảng giá** (đã cầm con trỏ tới nút cần đụng, có `pHead` + `pTail`):
+
+| Thao tác | DSLK đơn | DSLK kép |
+|----------|----------|----------|
+| Thêm/xóa đầu | $O(1)$ | $O(1)$ |
+| Thêm cuối | $O(1)$ | $O(1)$ |
+| **Xóa cuối** | $O(n)$ | **$O(1)$** |
+| Thêm/xóa **sau** một nút | $O(1)$ | $O(1)$ |
+| Thêm/xóa **trước** một nút | $O(n)$ | **$O(1)$** |
+| Xóa **chính nút đang cầm** | $O(n)$ | **$O(1)$** |
+| Duyệt xuôi | Có | Có |
+| Duyệt ngược | Không | Có |
+| Tìm theo giá trị / lấy thứ $k$ | $O(n)$ | $O(n)$ |
+| RAM mỗi nút (máy 64-bit, xấp xỉ) | ~16 byte | ~24 byte |
 
 **Ưu điểm**
 
-1. Duyệt hai chiều.
-2. Xóa nút đang cầm: $O(1)$.
-3. Xóa cuối: $O(1)$.
-4. Thêm trước một nút: $O(1)$.
-5. Cài deque (hai đầu) tự nhiên.
+1. Duyệt hai chiều — in ngược, so palindrome tại chỗ, đi lùi playlist.
+2. Xóa nút đang cầm $O(1)$ — LRU, editor, kernel (struct có thể nằm trong list).
+3. Xóa cuối $O(1)$ — deque, cache “bỏ phần tử cũ nhất”.
+4. Thêm trước một nút $O(1)$.
+5. Cài **deque** (hai đầu) tự nhiên: mọi thao tác đầu/cuối đều $O(1)$.
 
 **Nhược điểm**
 
-1. Mỗi nút thêm **một con trỏ** `pPrev` → tốn RAM (trên máy 64-bit: +8 byte/nút).
-2. Mọi thao tác phải sửa **nhiều con trỏ hơn** → dễ gán sai, khó debug.
-3. Vẫn không truy cập ngẫu nhiên $O(1)$, tìm kiếm vẫn $O(n)$.
+1. Thêm một con trỏ `pPrev` → tốn RAM (~+8 byte/nút trên máy 64-bit). 1000 `int`: đơn ~16 KB, kép ~24 KB (xem 3.5.2).
+2. Mỗi thao tác sửa **nhiều con trỏ hơn** → dễ gán sai, khó debug. Một chiều đứt, chiều kia còn.
+3. Vẫn **không** truy cập ngẫu nhiên $O(1)$; tìm kiếm vẫn $O(n)$; cache CPU kém hơn mảng.
 
-#### H. Ứng dụng DSLK kép
+**Khi nào chọn kép, khi nào đủ đơn?**
 
-| Ứng dụng | Vì sao kép? |
-|----------|-------------|
-| Lịch sử trình duyệt (Back / Forward) | Đi tới và lùi trang |
-| Undo / Redo trong editor | Hai hướng thao tác |
-| LRU Cache (cùng HashMap) | Đưa nút đang dùng lên đầu / xóa nút cuối $O(1)$ |
-| Playlist có nút “bài trước” | Lùi bài |
-| `std::list` trong C++ STL | Chính là DSLK kép |
+| Chọn kép khi… | Đủ đơn khi… |
+|---------------|-------------|
+| Cần Back/Forward, Undo/Redo | Chỉ thêm/xóa đầu, duyệt một chiều |
+| Cần xóa cuối / xóa nút đang cầm rất nhiều | List ngắn, RAM eo hẹp (vi điều khiển) |
+| Cài `std::list`-like, deque, LRU | Bài tập/đề thi chỉ yêu cầu DSLK đơn |
 
-#### I. Ví dụ LRU (ý tưởng cao cấp)
+**Bảng bẫy thường gặp:**
 
-Cache dung lượng $k$: HashMap `key → DNODE*`, danh sách kép lưu thứ tự “mới dùng”.
+| Bẫy | Triệu chứng | Cách tránh |
+|-----|-------------|------------|
+| Quên sửa chiều ngược | Xuôi đúng, ngược sai | Sau mỗi thao tác chạy `HopLeKep` / `XuatNguoc` |
+| Xét xóa đầu trước nhánh 1 nút | Crash `NULL->pPrev` | `if (head == tail)` đứng đầu |
+| Đảo thứ tự gán khi thêm | Mất phần sau / leak | Giữ `next`/`prev` cũ **trước** khi ghi đè |
+| Quên cập nhật `pTail` khi chèn/xóa cuối | Thêm cuối lần sau ghi đè sai chỗ | Mỗi nhánh đụng nút cuối phải đụng `pTail` |
+| `delete` rồi còn đọc `p->…` | Dangling | Lưu `pNext`/`pPrev` ra biến tạm trước |
 
-- Truy cập key: đưa nút lên đầu $O(1)$.
-- Thêm mới khi đầy: xóa `pTail` $O(1)$, thêm đầu $O(1)$.
+---
 
-Không cần code đầy đủ trong chương này; nắm ý: **kép cho phép di chuyển nút $O(1)$**.
+#### H. Ứng dụng: Back/Forward, Undo/Redo, LRU, deque
+
+Không học thuộc tên cho oai. Mỗi ứng dụng dưới đây dùng **đúng một** thế mạnh của kép.
+
+---
+
+**1. Lịch sử trình duyệt — Back / Forward**
+
+Mỗi trang là một nút. `current` là trang đang xem. Back = đi `pPrev`, Forward = đi `pNext`.
+
+**Chạy tay:**
+
+```
+ Visit A          current → [A]
+ Visit B          [A]↔[B]                  current = B
+ Visit C          [A]↔[B]↔[C]              current = C
+ Back             current lùi về B         (không xóa C — còn Forward)
+ Back             current lùi về A
+ Visit D          cắt nhánh Forward (xóa C), nối D sau A
+                  [A]↔[D]                  current = D
+                  (B, C bị hủy — giống trình duyệt thật)
+```
+
+```
+ Tại sao kép?  Back/Forward là đi lùi/tới một bước O(1).
+ Visit trang mới khi đang đứng giữa: XoaNode từ current->pNext đến cuối
+ rồi ThemCuoi — xóa từng nút đang cầm O(1).
+```
+
+---
+
+**2. Undo / Redo trong editor**
+
+Mỗi hành động gõ/xóa là một nút. `current` = trạng thái hiện tại.
+
+```
+ Gõ "a"           [a]                         current = a
+ Gõ "b"           [a]↔[b]                     current = b
+ Undo             current lùi về a            (b vẫn còn để Redo)
+ Gõ "c"           cắt nhánh redo (xóa b), nối c
+                  [a]↔[c]                     current = c
+```
+
+Cùng hình học với trình duyệt: **đi lùi/tới $O(1)$ + cắt đuôi $O(\text{số nút bị bỏ})$**.
+
+---
+
+**3. Deque (hàng đợi hai đầu)**
+
+Cần cả bốn thao tác $O(1)$: thêm đầu, thêm cuối, xóa đầu, xóa cuối. DSLK đơn **thất bại ở xóa cuối**. DSLK kép làm đủ.
+
+```
+  PushFront(x)  = ThemDauKep
+  PushBack(x)   = ThemCuoiKep
+  PopFront()    = XoaDauKep
+  PopBack()     = XoaCuoiKep     ← chỗ đơn không O(1)
+```
+
+`std::list` trong C++ STL là DSLK kép. `std::deque` thường là khối mảng, nhưng **ADT deque** cài bằng kép là cách giáo khoa.
+
+---
+
+**4. LRU Cache — case study (nâng cao, nắm ý là đủ)**
+
+**Bài toán.** Cache dung lượng $k$. `get(key)` / `put(key)` phải $O(1)$. Khi đầy, **vứt phần tử lâu nhất chưa dùng** (Least Recently Used).
+
+**Cấu trúc:** HashMap `key → DNODE*` (tìm nút $O(1)$) + DSLK kép lưu thứ tự “mới dùng”:
+
+```
+ pHead = MỚI dùng nhất          pTail = CŨ nhất (nạn nhân khi đầy)
+    │                               │
+    ▼                               ▼
+  [trang X] ↔ [trang Y] ↔ [trang Z]
+```
+
+Ba thao tác nguyên thủy của kép, mỗi cái $O(1)$:
+
+| Sự kiện | Làm gì trên kép |
+|---------|-----------------|
+| `get` trúng / `put` key đã có | `XoaNodeKep` nút đó rồi `ThemDauKep` (đưa lên đầu) |
+| `put` key mới, cache chưa đầy | `ThemDauKep` |
+| `put` key mới, cache đầy | `XoaCuoiKep` (vứt LRU) rồi `ThemDauKep` |
+
+**Chạy tay $k = 3$:**
+
+```
+ put(1)     [1]                          map: 1
+ put(2)     [2]↔[1]                      map: 1, 2
+ put(3)     [3]↔[2]↔[1]                  đầy
+ get(1)     đưa 1 lên đầu → [1]↔[3]↔[2]
+ put(4)     đầy, vứt tail=2, thêm 4     [4]↔[1]↔[3]
+            map xóa 2, thêm 4
+
+ get(2) → miss (đã vứt)
+ get(1) → hit, đưa 1 lên đầu            [1]↔[4]↔[3]
+```
+
+Không cần code HashMap trong chương này. Ý cần nắm: **kép cho phép di chuyển một nút đang cầm tới đầu list trong $O(1)$** — đơn không làm được vì không biết nút trước.
+
+---
+
+**5. Playlist “bài trước / bài sau”**
+
+Nút = một bài hát. `current->pNext` = bài sau, `current->pPrev` = bài trước. Nút Prev trên UI chính là `pPrev`. Nếu muốn hết danh sách quay lại bài đầu → nâng thành **vòng kép** (mục 3.4.2.E).
 
 ---
 
 ### 3.4.2. DSLK vòng (Circular Linked List)
 
-#### A. Định nghĩa vòng đơn
+#### A. Vì sao cần vòng? Tổ chức chỉ giữ `pTail`
 
-Nút cuối **không** trỏ `NULL` mà trỏ **về nút đầu**:
+**Ẩn dụ.** DSLK đơn/kép *thẳng* như hàng người có **người đầu** và **người cuối**; người cuối không nắm ai (`NULL`). DSLK vòng như người ngồi **quanh bàn**: người cuối nắm vai người đầu. Đi mãi sẽ gặp lại chỗ xuất phát — không có “điểm dừng NULL”.
+
+**Dữ liệu nào cần vòng?** Thứ tự tuần hoàn, không có “phần tử cuối” về nghĩa logic:
+
+- CPU chia time-slice cho $P_1, P_2, \ldots, P_n$ rồi quay lại $P_1$ (round-robin).
+- Playlist bật “lặp danh sách”.
+- Trò chơi đi vòng quanh bàn, bài toán Josephus.
+- Token ring: token đi hết trạm rồi về trạm 0.
+
+Ép những bài này vào DSLK thẳng cũng được, nhưng mỗi lần hết list phải tự viết `p = pHead` — dễ quên, và **không** còn tính chất “đứng ở nút bất kỳ cũng đi được hết vòng”.
+
+**Định nghĩa vòng đơn.** Mỗi nút vẫn chỉ có `pNext` (như DSLK đơn). Khác một điểm:
+
+> Nút cuối **không** trỏ `NULL` mà trỏ **về nút đầu**.
 
 ```
           ┌──────────────────────────────────────────┐
@@ -2599,19 +3242,54 @@ Nút cuối **không** trỏ `NULL` mà trỏ **về nút đầu**:
             ▲                               ▲
           head                            pTail
 
-  head = pTail->pNext     ← chỉ cần giữ pTail là suy ra được đầu
-  Không còn ô nào chứa NULL  →  while (p != NULL) sẽ chạy mãi
+  head = pTail->pNext
+  Không còn ô nào chứa NULL  →  while (p != NULL) sẽ CHẠY MÃI
 ```
 
-Thường chỉ giữ **một con trỏ `pTail`** (nút cuối): vì `pTail->pNext` chính là head. Thêm đầu/cuối đều $O(1)$.
+Ba hình dạng phải thuộc (rỗng / 1 nút / nhiều nút):
 
 ```
-head = pTail->pNext
+ RỖNG                         MỘT NÚT (tự trỏ mình)
+ pTail ──► NULL                    pTail
+                                     │
+                                     ▼
+                                  ┌────┬────┐
+                               ┌─►│ 10 │  ●─┼─┐
+                               │  └────┴────┘ │
+                               └──────────────┘
+                                  p->pNext = p
+                                  head = pTail = p
+
+ NHIỀU NÚT (n = 3)
+          ┌──────────────────────────────┐
+          ▼                              │
+        [10] ──► [20] ──► [30] ──────────┘
+          ▲                 ▲
+        head              pTail
+```
+
+---
+
+**Vì sao chỉ giữ `pTail`, không giữ `pHead`?**
+
+Đây là mẹo tổ chức then chốt — học thuộc *lý do*, không chỉ thuộc code.
+
+| Chỉ giữ | Thêm đầu | Thêm cuối | Lý do |
+|---------|----------|-----------|-------|
+| `pHead` | Muốn nối `last->pNext = nút mới` nhưng không có `last` → phải đi vòng $O(n)$ | Phải tìm last $O(n)$ | Mất đúng hai thao tác “rẻ” |
+| **`pTail`** | Nút mới chèn **ngay sau** tail (tức ngay trước head) — $O(1)$ | Cùng chỗ chèn, rồi dời `pTail` — $O(1)$ | `pTail->pNext` chính là head, luôn sẵn |
+
+```
+ head = pTail->pNext     ← không cần biến pHead riêng
+
+ Giữ cả pHead lẫn pTail trên vòng cũng được, nhưng thừa:
+ pHead luôn bằng pTail->pNext, thêm một bất biến phải bảo trì.
+ Giáo trình / đề thi: một con trỏ pTail là đủ.
 ```
 
 ```cpp
 struct CLIST {
-    NODE* pTail;     // NULL ⇔ rỗng
+    NODE* pTail;     // NULL ⇔ rỗng;  pTail->pNext = head
 };
 
 void KhoiTaoC(CLIST &l) { l.pTail = NULL; }
@@ -2619,43 +3297,130 @@ void KhoiTaoC(CLIST &l) { l.pTail = NULL; }
 bool IsEmptyC(CLIST l) { return l.pTail == NULL; }
 ```
 
+Dùng lại `NODE` / `TaoNode` của DSLK đơn (mục 3.3.1) — **cấu trúc nút không đổi**. Đổi cách nối đuôi với đầu, và đổi điều kiện dừng khi duyệt.
+
+**Bất biến vòng đơn:**
+
+| # | Bất biến |
+|---|----------|
+| 1 | Rỗng ⇔ `pTail == NULL` |
+| 2 | Một nút ⇔ `pTail->pNext == pTail` |
+| 3 | Nhiều nút: đi từ `pTail->pNext` theo `pNext` sẽ **quay lại** `pTail->pNext` sau đúng $n$ bước; không gặp `NULL` |
+| 4 | `pTail` luôn là nút **đứng trước head** (người cuối bàn) |
+
+---
+
 #### B. Duyệt vòng — **không** viết `while (p != NULL)`
 
-Vì không còn `NULL`, vòng `while (p != NULL)` **chạy mãi**.
+Vì không còn `NULL`, vòng `while (p != NULL)` **không bao giờ kết thúc**. Đây là bug số 1 khi mới học vòng.
 
-**Mã giả:**
+**Ý tưởng.** Xuất phát tại head (`pTail->pNext`), in, tiến, **lặp đến khi gặp lại head**.
+
+List 1 nút: head.next = chính head. Nếu dùng `while (p != head)` **trước** khi in thì thân vòng không chạy → bỏ sót nút duy nhất. Vì vậy phải **làm rồi mới kiểm tra** → `do-while`.
 
 ```
 THUẬT TOÁN XuatVong(l)
-1. nếu pTail = NULL thì return
-2. p ← pTail.pNext          // head
+1. nếu pTail = NULL thì return          // rỗng
+2. p ← pTail.pNext                      // head
 3. lặp
 4.     in p.data
 5.     p ← p.pNext
-6. until p = pTail.pNext    // da quay ve head
+6. until p = pTail.pNext                // đã quay về head
+```
+
+```
+ List 10 → 20 → 30 → (về 10)
+
+ p bắt đầu = 10
+   in 10, p = 20     20 ≠ head  → tiếp
+   in 20, p = 30     30 ≠ head  → tiếp
+   in 30, p = 10     10 = head  → dừng
+ In: 10 20 30  (đúng một vòng, không lặp vô hạn)
 ```
 
 ```cpp
 void XuatVong(CLIST l) {
     if (l.pTail == NULL) return;
-    NODE* p = l.pTail->pNext;
+    NODE* p = l.pTail->pNext;    // head
     do {
         cout << p->data << " -> ";
         p = p->pNext;
     } while (p != l.pTail->pNext);
     cout << "(quay ve dau)\n";
 }
+
+int DemSoPhanTuVong(CLIST l) {
+    if (l.pTail == NULL) return 0;
+    int dem = 0;
+    NODE* p = l.pTail->pNext;
+    do {
+        dem++;
+        p = p->pNext;
+    } while (p != l.pTail->pNext);
+    return dem;
+}
+
+NODE* TimVong(CLIST l, int x) {
+    if (l.pTail == NULL) return NULL;
+    NODE* p = l.pTail->pNext;
+    do {
+        if (p->data == x) return p;
+        p = p->pNext;
+    } while (p != l.pTail->pNext);
+    return NULL;
+}
 ```
 
-Dùng `do-while`: thân lặp chạy **trước**, rồi mới kiểm tra đã về đầu chưa — cần vì list 1 nút: `pNext` trỏ chính nó.
+**Bảng đối chiếu điều kiện dừng** (thuộc để không lẫn 3.3 / 3.4.1 / 3.4.2):
+
+| Loại list | Xuất phát | Điều kiện lặp | Gặp `NULL`? |
+|-----------|-----------|---------------|-------------|
+| Đơn thẳng | `pHead` | `while (p != NULL)` | Có, ở nút cuối |
+| Kép thẳng xuôi | `pHead` | `while (p != NULL)` | Có |
+| Kép thẳng ngược | `pTail` | `while (p != NULL)` theo `pPrev` | Có, ở nút đầu |
+| **Vòng đơn** | `pTail->pNext` | `do { … p = p->pNext; } while (p != head)` | **Không** |
+
+**Bẫy duyệt:**
+
+| Code sai | Chuyện gì xảy ra |
+|----------|------------------|
+| `while (p != NULL)` | Treo máy / timeout |
+| `while (p != head) { in; p = p->pNext; }` với `p` xuất phát tại head | **Không in gì** — kể cả list 1 nút lẫn $n$ nút |
+| `for (p = head; p != head; p = p->pNext)` | Cùng lỗi: điều kiện sai ngay từ đầu |
+| Quên nhánh `pTail == NULL` rồi đọc `pTail->pNext` | Crash trên list rỗng |
+| Dùng `p != pTail` làm điều kiện dừng khi muốn in hết | **Bỏ nút cuối** (tail không được in) |
+
+$O(n)$ thời gian, $O(1)$ phụ — giống duyệt thẳng, chỉ khác điều kiện dừng.
 
 ---
 
-#### C. Thêm vào cuối vòng — $O(1)$
+#### C. Thêm đầu / thêm cuối — cùng 2 phép, khác `pTail`
 
-Hai trường hợp. Vẽ cho thuộc tay — đây là chỗ sinh viên hay gán sai.
+**Ý tưởng then chốt của cả mục 3.4.2:**
 
-**List rỗng:** nút tự trỏ tới chính nó.
+> Trên vòng, nút mới **luôn được chèn ngay sau `pTail`** (khe giữa đuôi và đầu).  
+> - **Thêm cuối:** chèn xong, **dời** `pTail` sang nút mới → nút mới thành đuôi.  
+> - **Thêm đầu:** chèn xong, **không dời** `pTail` → nút mới đứng ngay sau đuôi, tức là thành head mới (`head = pTail->pNext`).
+
+Hai hàm gần như giống nhau. Nhầm một dòng `pTail = p` là đổi đầu thành cuối.
+
+```
+          khe chèn luôn ở đây
+          ┌──────────┐
+          │          ▼
+        tail        head
+          │          │
+        [30] ──► [10] ──► [20] ──► (về 30)
+                    ▲
+                    └── thêm đầu: nút mới ngồi vào khe, pTail đứng yên
+          thêm cuối: nút mới ngồi vào khe, rồi pTail nhảy sang nút mới
+```
+
+---
+
+##### ① Thêm cuối — $O(1)$
+
+**List rỗng:** nút tự trỏ tới chính nó (hình “một nút” mục A). Đây là nhánh bắt buộc — không có `pTail->pNext` để đọc.
 
 ```
       pTail
@@ -2665,15 +3430,13 @@ Hai trường hợp. Vẽ cho thuộc tay — đây là chỗ sinh viên hay gá
   ┌─►│ 30 │  ●─┼─┐
   │  └────┴────┘ │
   └──────────────┘
-   p->pNext = p     (một nút thành một vòng)
+   p->pNext = p
 ```
 
-**List đã có nút:** chèn `p` **ngay sau** `pTail` (kề trước head), rồi dời `pTail` sang `p`.
-
-Luôn vẽ từ **head** (không vẽ từ tail — dễ hiểu nhầm thứ tự).
+**List đã có nút** — 3 phép, **không được đảo ① và ②**:
 
 ```
- TRƯỚC  head=10, pTail=30
+ TRƯỚC  head = 10, pTail = 30, thêm p = 40
           ┌────────────────────────────────┐
           ▼                                │
         ┌────┬────┐   ┌────┬────┐   ┌────┬────┐
@@ -2682,46 +3445,70 @@ Luôn vẽ từ **head** (không vẽ từ tail — dễ hiểu nhầm thứ t�
             ▲                           ▲
           head                        pTail
 
- Thêm 40 vào cuối — 3 phép:
- ①  p->pNext = pTail->pNext     (40 nắm head = 10)
- ②  pTail->pNext = p            (30 nắm 40)
- ③  pTail = p                   (40 thành đuôi)
+ ① p->pNext = pTail->pNext     (40 nắm head = 10 — GIỮ head trước khi cắt)
+ ② pTail->pNext = p            (30 nắm 40)
+ ③ pTail = p                   (40 thành đuôi)
 
- SAU   head vẫn 10, pTail=40
+ SAU   head vẫn 10, pTail = 40
           ┌──────────────────────────────────────────┐
           ▼                                          │
-        ┌────┬────┐   ┌────┬────┐   ┌────┬────┐   ┌────┬────┐
-        │ 10 │  ●─┼──►│ 20 │  ●─┼──►│ 30 │  ●─┼──►│ 40 │  ●─┼┘
-        └────┴────┘   └────┴────┘   └────┴────┘   └────┴────┘
-            ▲                                       ▲
-          head                                    pTail
+        [10] ──► [20] ──► [30] ──► [40] ─────────────┘
+          ▲                          ▲
+        head                       pTail
 ```
 
-Thứ tự 3 phép gán (list không rỗng):
-
-1. `p->pNext = l.pTail->pNext`  — nút mới nắm head cũ  
-2. `l.pTail->pNext = p`         — tail cũ nắm nút mới  
-3. `l.pTail = p`                — nút mới thành tail  
-
-Đảo (1) và (2) sẽ mất head.
+```
+THUẬT TOÁN ThemCuoiVong(l, p)
+1. nếu pTail = NULL
+2.     pTail ← p
+3.     p.pNext ← p              // 1 nút tự trỏ mình
+4.     return
+5. p.pNext ← pTail.pNext        // p nắm head cũ
+6. pTail.pNext ← p              // tail cũ nắm p
+7. pTail ← p                    // p thành đuôi
+```
 
 ```cpp
 void ThemCuoiVong(CLIST &l, NODE* p) {
+    if (p == NULL) return;
     if (l.pTail == NULL) {
         l.pTail = p;
-        p->pNext = p;          // 1 nut tu tro toi minh
+        p->pNext = p;
         return;
     }
-    p->pNext = l.pTail->pNext; // p tro toi head
-    l.pTail->pNext = p;        // tail cu tro toi p
-    l.pTail = p;               // p thanh tail moi
+    p->pNext = l.pTail->pNext;   // ① giữ head
+    l.pTail->pNext = p;          // ②
+    l.pTail = p;                 // ③
 }
 ```
 
-Thêm đầu vòng: giống thêm cuối **nhưng không đổi `pTail`**.
+**Bẫy:** đảo ① và ② → `pTail->pNext = p` trước, lúc đó `p->pNext` còn `NULL` (nếu `TaoNode`) hoặc rác; mất địa chỉ head, list đứt + rò rỉ.  
+**Bẫy:** quên `p->pNext = p` khi rỗng → nút không khép vòng, duyệt `do-while` không bao giờ gặp lại head (hoặc crash).
+
+---
+
+##### ② Thêm đầu — $O(1)$
+
+Cùng ①② với thêm cuối, **bỏ bước ③**.
+
+```
+ TRƯỚC  head = 10, pTail = 30, thêm p = 5
+
+ ① p->pNext = pTail->pNext     (5 nắm 10)
+ ② pTail->pNext = p            (30 nắm 5)
+    pTail KHÔNG đổi            (đuôi vẫn 30)
+
+ SAU   head mới = pTail->pNext = 5
+          ┌──────────────────────────────────────────┐
+          ▼                                          │
+        [5] ──► [10] ──► [20] ──► [30] ──────────────┘
+          ▲                            ▲
+        head                         pTail
+```
 
 ```cpp
 void ThemDauVong(CLIST &l, NODE* p) {
+    if (p == NULL) return;
     if (l.pTail == NULL) {
         l.pTail = p;
         p->pNext = p;
@@ -2729,19 +3516,99 @@ void ThemDauVong(CLIST &l, NODE* p) {
     }
     p->pNext = l.pTail->pNext;
     l.pTail->pNext = p;
-    /* pTail khong doi */
+    /* pTail khong doi — chi khac ThemCuoiVong dung 1 dong nay */
 }
 ```
 
+**Bảng nhớ 1 dòng:**
+
+| Hàm | Chèn sau `pTail` | Có `pTail = p`? | Nút mới thành |
+|-----|------------------|-----------------|---------------|
+| `ThemDauVong` | Có | Không | Head |
+| `ThemCuoiVong` | Có | Có | Tail |
+
+Nhánh rỗng của hai hàm **giống hệt**: một nút vừa là đầu vừa là cuối.
+
+$O(1)$ cả hai. Đây là lý do chọn giữ `pTail`.
+
 ---
 
-#### D. Xóa đầu vòng
+##### ③ Thêm sau một nút `q` — $O(1)$
+
+Giống DSLK đơn: `p->pNext = q->pNext; q->pNext = p`. Nếu `q == pTail` thì đây chính là thêm cuối → phải dời `pTail`.
+
+```cpp
+void ThemSauVong(CLIST &l, NODE* q, NODE* p) {
+    if (q == NULL || p == NULL) return;
+    p->pNext = q->pNext;
+    q->pNext = p;
+    if (q == l.pTail)
+        l.pTail = p;
+}
+```
+
+Thêm **trước** `q` trên vòng đơn vẫn $O(n)$: không có `pPrev`, phải đi tìm nút `t` sao cho `t->pNext == q` (đi nhiều nhất một vòng). Muốn $O(1)$ thì dùng vòng kép.
+
+---
+
+##### ④ Dựng vòng `[10]→[20]→[30]` bằng thêm cuối
+
+```
+ 0. rỗng:     pTail = NULL
+ 1. +10:      [10]↺                 pTail = 10,  10.next = 10
+ 2. +20:      [10]→[20]↺            pTail = 20,  20.next = 10
+ 3. +30:      [10]→[20]→[30]↺       pTail = 30,  30.next = 10
+```
+
+So với dựng DSLK đơn: bước 1 khác (tự trỏ mình, không trỏ `NULL`); mỗi bước sau chèn vào khe tail–head thay vì “nối vào `NULL`”.
+
+---
+
+#### D. Xóa đầu / xóa cuối / xóa giá trị / hủy
+
+##### ⑤ Xóa đầu — $O(1)$
+
+Head luôn là `pTail->pNext`. Cắt head ra = cho tail nắm **nút sau head**.
+
+**Một nút:** sau khi xóa, list rỗng → `pTail = NULL`.
+
+```
+ TRƯỚC  xóa head = 10, pTail = 30
+          ┌────────────────────────────────┐
+          ▼                                │
+        [10] ──► [20] ──► [30] ────────────┘
+          ▲                 ▲
+        head              pTail
+
+  headMoi = 20
+  pTail->pNext = 20
+  delete 10
+
+ SAU
+          ┌──────────────────┐
+          ▼                  │
+        [20] ──► [30] ───────┘
+          ▲        ▲
+        head     pTail
+```
+
+```
+THUẬT TOÁN XoaDauVong(l)
+1. nếu pTail = NULL thì return
+2. head ← pTail.pNext
+3. nếu pTail = head              // 1 nút
+4.     delete head
+5.     pTail ← NULL
+6.     return
+7. pTail.pNext ← head.pNext      // tail nắm head mới
+8. delete head
+```
 
 ```cpp
 void XoaDauVong(CLIST &l) {
     if (l.pTail == NULL) return;
     NODE* head = l.pTail->pNext;
-    if (l.pTail == head) {     // 1 nut
+    if (l.pTail == head) {
         delete head;
         l.pTail = NULL;
         return;
@@ -2751,7 +3618,66 @@ void XoaDauVong(CLIST &l) {
 }
 ```
 
-Xóa một giá trị — viết đủ, không chỉ “tưởng tượng”:
+**Bẫy:** quên nhánh 1 nút → `pTail->pNext = head->pNext` nhưng `head->pNext == head` (đã delete) → `pTail` trỏ vùng nhớ chết.
+
+---
+
+##### ⑥ Xóa cuối — $O(n)$ trên vòng **đơn**
+
+Đây là chỗ hay hiểu sai.
+
+> Có `pTail` **không** biến xóa cuối thành $O(1)$ trên vòng đơn.  
+> Xóa tail cần nút **đứng trước tail** (`prev->pNext = head`, rồi `pTail = prev`).  
+> Vòng đơn không lưu `pPrev` → phải đi **gần một vòng** từ head đến khi `p->pNext == pTail`.
+
+```
+ TRƯỚC  xóa tail = 30, cần tìm prev = 20
+          [10] → [20] → [30] ↺
+            ▲      ▲      ▲
+          head   prev   pTail
+
+  prev->pNext = head = 10
+  pTail = prev = 20
+  delete 30
+
+ SAU     [10] → [20] ↺
+```
+
+**Một nút:** giống xóa đầu — `pTail = NULL`.
+
+```cpp
+void XoaCuoiVong(CLIST &l) {
+    if (l.pTail == NULL) return;
+
+    NODE* head = l.pTail->pNext;
+    if (l.pTail == head) {          // 1 nut
+        delete head;
+        l.pTail = NULL;
+        return;
+    }
+
+    NODE* prev = head;
+    while (prev->pNext != l.pTail)  // di tim nut ap chot — O(n)
+        prev = prev->pNext;
+
+    prev->pNext = head;             // khép vòng bỏ tail
+    delete l.pTail;
+    l.pTail = prev;
+}
+```
+
+| | Vòng đơn + `pTail` | Vòng kép | DSLK kép thẳng |
+|--|--------------------|----------|----------------|
+| Xóa đầu | $O(1)$ | $O(1)$ | $O(1)$ |
+| Xóa cuối | **$O(n)$** | $O(1)$ | $O(1)$ |
+
+Muốn xóa cuối $O(1)$ trên dữ liệu tuần hoàn → **vòng kép** (mục E).
+
+---
+
+##### ⑦ Xóa theo giá trị — $O(n)$
+
+Đi một vòng với cặp `(prev, p)`. Khi gặp `p->data == x`: `prev->pNext = p->pNext`. Nếu `p` là tail thì `pTail = prev`. Nếu `p` là head thì `pTail->pNext` tự thành head mới vì `prev` đang là tail.
 
 ```cpp
 void XoaGiaTriVong(CLIST &l, int x) {
@@ -2769,7 +3695,8 @@ void XoaGiaTriVong(CLIST &l, int x) {
     do {
         if (p->data == x) {
             prev->pNext = p->pNext;
-            if (p == l.pTail) l.pTail = prev;
+            if (p == l.pTail)
+                l.pTail = prev;
             delete p;
             return;
         }
@@ -2779,30 +3706,76 @@ void XoaGiaTriVong(CLIST &l, int x) {
 }
 ```
 
-$O(n)$. `do-while` để list 1 nút vẫn được xét. Nếu xóa head, `pTail->pNext` tự thành head mới nhờ `prev` đang là tail.
+`do-while` để list 1 nút vẫn được xét (nhánh 1 nút đã return trước, nhưng vòng này còn dùng khi $n \ge 2$). Không thấy `x` thì đi hết một vòng rồi dừng — **không treo**.
+
+---
+
+##### ⑧ Hủy vòng — nhớ **cắt vòng** trước
+
+Nếu gọi `XoaDauVong` trong `while (pTail != NULL)` thì được, vì mỗi lần xóa giảm $n$, hết thì `pTail = NULL`.
+
+Cách an toàn hơn khi muốn tái sử dụng code hủy DSLK thẳng: **cắt vòng thành list thẳng**, rồi `delete` như 3.3.
+
+```
+  [10] → [20] → [30] ↺     cắt: pTail->pNext = NULL
+  [10] → [20] → [30] → NULL     giờ while (p != NULL) an toàn
+```
+
+```cpp
+void HuyDanhSachVong(CLIST &l) {
+    if (l.pTail == NULL) return;
+    NODE* p = l.pTail->pNext;   // head
+    l.pTail->pNext = NULL;      // CẮT VÒNG — bien thanh DSLK don thang
+    l.pTail = NULL;
+    while (p != NULL) {
+        NODE* t = p->pNext;
+        delete p;
+        p = t;
+    }
+}
+```
+
+**Bẫy:** hủy bằng `while (p != NULL)` **mà không cắt vòng** → treo, không `delete` hết, rò rỉ + chương trình không kết thúc.
+
+---
+
+##### ⑨ Ví dụ chạy tay cả chuỗi (vòng đơn)
+
+```
+ 0. rỗng
+ 1. ThemCuoi 20     →  [20]↺
+ 2. ThemDau 10      →  [10]→[20]↺          (pTail vẫn 20)
+ 3. ThemCuoi 30     →  [10]→[20]→[30]↺     (pTail = 30)
+ 4. XoaDau          →  [20]→[30]↺
+ 5. XoaGiaTri 30    →  [20]↺               (xóa tail, pTail = 20)
+ 6. XoaCuoi         →  rỗng
+ XuatVong bước 3:  10 -> 20 -> 30 -> (quay ve dau)
+```
 
 ---
 
 #### E. DSLK vòng kép (circular doubly)
+
+Ghép ý 3.4.1 và 3.4.2: mỗi nút có `pPrev` + `pNext`, **và** hai đầu nắm nhau.
 
 ```
      ┌───────────────────────────────────────────────────┐
      ▼                                                   │
  ┌────┬────┬────┐   ┌────┬────┬────┐   ┌────┬────┬────┐  │
  │  ● │ 10 │  ●─┼──►│  ● │ 20 │  ●─┼──►│  ● │ 30 │  ●─┼──┘
- └────┴────┴────┘   └─▲──┴────┴────┘   └─▲──┴────┴────┘
-     ▲                │                  │
-     └────────────────┴──────────────────┘
+ │    │    │    │◄──┼─●  │    │    │◄──┼─●  │    │    │
+ └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
+     ▲                                                 ▲
    head                                     tail = head->pPrev
-   head->pPrev == tail     tail->pNext == head
+
+ Bất biến vòng kép (không rỗng):
+   head->pPrev == tail
+   tail->pNext == head
+   mọi cặp kề: a.pNext = b  ⇔  b.pPrev = a
+ Một nút: p->pNext == p->pPrev == p
 ```
 
-- `pHead->pPrev == pTail`
-- `pTail->pNext == pHead`
-
-Mọi thêm/xóa đầu-cuối đều $O(1)$, duyệt hai chiều khép kín. Dùng cho playlist lặp, buffer vòng.
-
-**Cài đặt tối thiểu** (đủ để hiểu, không nhồi thêm ADT mới):
+**Tổ chức:** chỉ cần giữ `head`. Tail suy ra: `head->pPrev`. Không bắt buộc thêm `pTail` (khác vòng đơn — vòng đơn *phải* giữ tail mới thêm đầu/cuối $O(1)$).
 
 ```cpp
 struct CDNODE {
@@ -2810,15 +3783,53 @@ struct CDNODE {
     CDNODE *pPrev, *pNext;
 };
 
-void ThemCuoiVongKep(CDNODE* &head, int x) {
+CDNODE* TaoCDNode(int x) {
     CDNODE* p = new CDNODE;
     p->data = x;
+    p->pPrev = p->pNext = p;   // mac dinh 1 nut tu khép hai chieu
+    return p;
+}
+```
+
+**Duyệt:** cùng `do-while` với vòng đơn; muốn ngược thì `p = p->pPrev`.
+
+```cpp
+void XuatVongKep(CDNODE* head) {
+    if (head == NULL) return;
+    CDNODE* p = head;
+    do {
+        cout << p->data << " ";
+        p = p->pNext;
+    } while (p != head);
+    cout << "\n";
+}
+```
+
+**Thêm cuối $O(1)$:**
+
+```
+ TRƯỚC  head=10, tail=head->pPrev=30, thêm p=40
+  10 ↔ 20 ↔ 30  (30.next=10, 10.prev=30)
+
+  p.next = head          (40 nắm 10)
+  p.prev = tail          (40 nắm 30)
+  tail.next = p          (30 nắm 40)
+  head.prev = p          (10.prev = 40)
+  head không đổi
+
+ SAU   10 ↔ 20 ↔ 30 ↔ 40 ↺
+       head            tail = 40 = head->pPrev
+```
+
+```cpp
+void ThemCuoiVongKep(CDNODE* &head, CDNODE* p) {
+    if (p == NULL) return;
     if (head == NULL) {
         p->pNext = p->pPrev = p;
         head = p;
         return;
     }
-    CDNODE* tail = head->pPrev;   // vong kep: prev cua head la tail
+    CDNODE* tail = head->pPrev;
     p->pNext = head;
     p->pPrev = tail;
     tail->pNext = p;
@@ -2826,32 +3837,173 @@ void ThemCuoiVongKep(CDNODE* &head, int x) {
 }
 ```
 
-Duyệt: `do { ... p = p->pNext; } while (p != head);` — giống vòng đơn.
+**Thêm đầu $O(1)$:** thêm cuối xong, `head = p` (nút mới vừa là đuôi logic, dời cửa head sang nó thì nó thành đầu). Hoặc chèn vào khe `tail ↔ head` rồi `head = p`.
+
+```cpp
+void ThemDauVongKep(CDNODE* &head, CDNODE* p) {
+    ThemCuoiVongKep(head, p);
+    if (head != NULL)
+        head = p;    // p vua la tail, dời head sang p → p thành đầu
+}
+```
+
+**Xóa một nút đang cầm $O(1)$** — kể cả xóa cuối (thắng vòng đơn):
+
+```cpp
+void XoaNodeVongKep(CDNODE* &head, CDNODE* p) {
+    if (head == NULL || p == NULL) return;
+
+    if (p->pNext == p) {          // 1 nut
+        delete p;
+        head = NULL;
+        return;
+    }
+    p->pPrev->pNext = p->pNext;
+    p->pNext->pPrev = p->pPrev;
+    if (p == head)
+        head = p->pNext;
+    delete p;
+}
+
+void XoaDauVongKep(CDNODE* &head) {
+    if (head != NULL) XoaNodeVongKep(head, head);
+}
+
+void XoaCuoiVongKep(CDNODE* &head) {
+    if (head != NULL) XoaNodeVongKep(head, head->pPrev);  // O(1)!
+}
+```
+
+**Hủy:** cắt vòng (`head->pPrev->pNext = NULL` và `head->pPrev = NULL`) rồi xóa như kép thẳng; hoặc `while (head != NULL) XoaDauVongKep(head)`.
+
+**Khi nào dùng vòng kép?** Playlist lặp có nút Prev, game đi vòng hai chiều, buffer tròn cần xóa hai đầu $O(1)$. Đề thi ít bắt cài đủ ADT này — hiểu bất biến + thêm cuối + xóa nút đang cầm là đạt.
 
 ---
 
-#### F. Bài toán Josephus — ứng dụng kinh điển của vòng
+#### F. Ứng dụng: round-robin, playlist, Josephus
 
-$n$ người đứng vòng, đếm $k$ người thì loại 1, lặp đến khi còn 1 người.
+---
 
-**Chạy tay $n=5$, $k=2$** (bắt đầu ở người 1; code đứng ở người *trước* người bị loại):
+**1. Round-robin scheduling (hệ điều hành)**
+
+CPU có $n$ tiến trình, mỗi tiến trình được chạy một **quantum** (lát thời gian), xong thì đến tiến trình kế, hết vòng thì về tiến trình đầu. Đúng hình vòng.
 
 ```
- Ban đầu (vòng):
+  pTail trỏ tiến trình VỪA chạy xong
+  pTail->pNext = tiến trình SẼ chạy (head của “hàng chờ vòng”)
+
+  Lát kế:
+    chạy head
+    nếu head còn việc  →  coi như “chuyển head ra cuối”
+                          = ThemCuoi ý niệm: chỉ dời pTail = pTail->pNext
+                          (không cấp phát nút mới — chỉ xoay cửa)
+    nếu head xong việc →  XoaDauVong
+```
+
+**Chạy tay.** Ba tiến trình, thời gian còn lại $(P_1=3,\ P_2=2,\ P_3=1)$, quantum $= 1$.
+
+```
+ Ban đầu vòng:  P1(3) → P2(2) → P3(1) ↺     sắp chạy P1
+
+ Q1: P1 chạy → P1(2). Chưa xong, xoay:  P2(2) → P3(1) → P1(2)
+ Q2: P2 chạy → P2(1). Xoay:             P3(1) → P1(2) → P2(1)
+ Q3: P3 chạy → P3(0). XONG, xóa P3:     P1(2) → P2(1)
+ Q4: P1 chạy → P1(1). Xoay:             P2(1) → P1(1)
+ Q5: P2 chạy → P2(0). XONG, xóa P2:     P1(1)
+ Q6: P1 chạy → P1(0). XONG. Vòng rỗng.
+
+ Thứ tự hoàn thành: P3, P2, P1
+```
+
+“Xoay” không cần `ThemCuoi` thật: `pTail = pTail->pNext` là đủ — vì list đã là vòng, dời tail một bước = đưa head cũ thành tail, head mới là nút kế. Đây là thao tác **chỉ vòng mới có** ($O(1)$, không cấp phát).
+
+---
+
+**2. Playlist lặp / slide show**
+
+- Vòng đơn: nút Next. Hết bài cuối → bài đầu tự động (`current = current->pNext`, không cần `if (cuoi) current = head`).
+- Vòng kép: thêm nút Prev. UI “bài trước” = `current = current->pPrev`.
+- Thêm bài sau bài đang phát = `ThemSau`. Xóa bài đang phát = xóa nút đang cầm (vòng kép $O(1)$; vòng đơn phải có `prev`).
+
+---
+
+**3. Game: lượt chơi quanh bàn**
+
+Người chơi là nút vòng. `current` = người đang đi. Hết lượt: `current = current->pNext`. Người bị loại: xóa nút (Josephus là trường hợp đếm $k$ rồi loại).
+
+---
+
+**4. Circular buffer ≠ DSLK vòng**
+
+Sinh viên hay gọi cả hai là “vòng”. Phân biệt:
+
+| | DSLK vòng | Circular buffer (mảng vòng) |
+|--|-----------|------------------------------|
+| Lưu | Nút rải Heap, nối con trỏ | Mảng cố định, hai chỉ số `front`/`rear` |
+| Hết chỗ | Còn RAM là thêm được | Đầy khi $(rear+1) \bmod n = front$ |
+| Dùng khi | $n$ không biết trước, thêm/xóa giữa | Hàng đợi kích thước kịch trần (buffer âm thanh, IO) |
+
+Cùng ý “quay lại đầu”, **khác cấu trúc**. Chương 4 (Queue) sẽ gặp mảng vòng.
+
+---
+
+**5. Bài toán Josephus — ứng dụng kinh điển**
+
+$n$ người đứng vòng, đánh số $1..n$. Đếm $k$ người thì loại 1, tiếp tục từ người kế, đến khi còn 1 người. Tìm người sống sót.
+
+Mô hình: vòng đơn; xóa nút đang cầm cần con trỏ **đứng trước** người bị loại.
+
+**Chạy tay $n=5$, $k=2$** (bắt đầu đếm từ người 1; code đứng ở người *trước* người sắp bị loại):
+
+```
+ Ban đầu:
      ┌─────────────────────────────────┐
      ▼                                 │
    ┌───┐   ┌───┐   ┌───┐   ┌───┐   ┌───┐
    │ 1 │──►│ 2 │──►│ 3 │──►│ 4 │──►│ 5 │┘
    └───┘   └───┘   └───┘   └───┘   └───┘
 
- Loại 2 →  1 → 3 → 4 → 5 → 1
- Loại 4 →  1 → 3 → 5 → 1
- Loại 1 →  3 → 5 → 3
- Loại 5 →  3 → 3     ← sống sót
+ k=2: loại người thứ 2 kể từ chỗ đếm.
+ Lần 1: đếm 1, 2  → loại 2.  Còn 1 → 3 → 4 → 5 → 1
+ Lần 2: từ 3, đếm 3, 4  → loại 4.  Còn 1 → 3 → 5 → 1
+ Lần 3: từ 5, đếm 5, 1  → loại 1.  Còn 3 → 5 → 3
+ Lần 4: từ 3, đếm 3, 5  → loại 5.  Còn 3 → 3
+ Sống sót: 3
+```
+
+**Truy vết con trỏ** (khớp code dưới: `p` đứng *trước* người bị loại; với $k=2$ thì không cần vòng `for`, `p->pNext` chính là nạn nhân):
+
+```
+ Ban đầu p = người 1 (head). k=2 → p phải đứng trước nạn nhân.
+ Vòng while còn > 1 người:
+   for i = 1 .. k-2: p đi tới        (k=2: for không chạy)
+   chet = p->pNext
+   p->pNext = chet->pNext            (bỏ chet khỏi vòng)
+   nếu chet là pTail thì pTail = p
+   delete chet
+   p = p->pNext                      (người kế tiếp bắt đầu đếm mới)
+
+ Lần 1: p=1, chet=2, 1 nắm 3, p ← 3
+ Lần 2: p=3, chet=4, 3 nắm 5, p ← 5
+ Lần 3: p=5, chet=1, 5 nắm 3, p ← 3
+ Lần 4: p=3, chet=5, 3 nắm 3 (tự trỏ), p ← 3
+ Dừng: p->pNext == p, sống = 3
 ```
 
 ```
-n=5, k=2:  loại 2, 4, 1, 5  → còn 3
+THUẬT TOÁN Josephus(n, k) → người sống sót
+1. nếu n < 1 hoặc k < 1 thì trả về -1
+2. nếu k = 1 thì trả về n          // loại lần lượt người hiện tại
+3. dựng vòng 1..n bằng ThemCuoiVong
+4. p ← head
+5. while p.pNext ≠ p               // còn > 1 người
+6.     lặp k-2 lần: p ← p.pNext    // p đứng trước nạn nhân
+7.     chet ← p.pNext
+8.     p.pNext ← chet.pNext
+9.     nếu chet là pTail thì pTail ← p
+10.    delete chet
+11.    p ← p.pNext
+12. sống ← p.data; delete p; trả về sống
 ```
 
 ```cpp
@@ -2864,16 +4016,15 @@ int Josephus(int n, int k) {
     for (int i = 1; i <= n; i++)
         ThemCuoiVong(l, TaoNode(i));
 
-    NODE* p = l.pTail->pNext;   // bat dau o nguoi 1
-    while (p->pNext != p) {     // con > 1 nguoi
+    NODE* p = l.pTail->pNext;      // bat dau o nguoi 1
+    while (p->pNext != p) {        // con > 1 nguoi
         for (int i = 1; i < k - 1; i++)
             p = p->pNext;
-        /* p dung truoc nguoi bi loai */
         NODE* chet = p->pNext;
         p->pNext = chet->pNext;
         if (chet == l.pTail) l.pTail = p;
         delete chet;
-        p = p->pNext;           // nguoi ke tiep tiep tuc dem
+        p = p->pNext;
     }
     int song = p->data;
     delete p;
@@ -2882,9 +4033,11 @@ int Josephus(int n, int k) {
 }
 ```
 
-Code trên đúng với ví dụ $n=5, k=2$ (sống sót = 3) và $k \ge 2$. $k=1$ xử lý riêng để không đụng `p->pNext` theo nghĩa “đứng trước người bị loại”.
+Code đúng với $n=5, k=2$ (sống sót $= 3$) và $k \ge 2$. $k=1$ xử lý riêng: nếu để vào vòng `for` thì `p` “đứng trước nạn nhân” không còn đúng nghĩa khi nạn nhân là chính `p`.
 
-Độ phức tạp: $O(n \cdot k)$ cách naive; có công thức $O(n)$ nếu chỉ cần vị trí sống sót, không cần mô phỏng.
+**Thêm một test** (bài tập 12): $n=5, k=3$ → loại 3, 1, 5, 2 → sống sót **4**.
+
+Độ phức tạp mô phỏng: $O(n \cdot k)$ naive. Chỉ cần *vị trí* sống sót, không cần dựng list: công thức $f(1)=0$, $f(i)=(f(i-1)+k) \bmod i$ (0-based) — $O(n)$, không thuộc trọng tâm chương.
 
 ---
 
@@ -2892,34 +4045,69 @@ Code trên đúng với ví dụ $n=5, k=2$ (sống sót = 3) và $k \ge 2$. $k=
 
 **Ưu**
 
-- Từ **mọi** nút đều đi được hết danh sách (không cần quay về head).
-- Thêm đầu và cuối $O(1)$ nếu giữ `pTail`.
-- Mô hình tự nhiên cho dữ liệu tuần hoàn: CPU scheduling round-robin, playlist lặp, token ring.
+- Từ **mọi** nút đi được hết danh sách, không cần quay về biến `pHead`.
+- Thêm đầu **và** thêm cuối $O(1)$ nếu giữ `pTail` (vòng đơn).
+- “Xoay” cửa $O(1)$: `pTail = pTail->pNext` — round-robin không cấp phát.
+- Mô hình tự nhiên cho dữ liệu tuần hoàn.
 
 **Nhược**
 
-- Dễ vòng lặp vô hạn nếu quên điều kiện dừng.
-- Không có `NULL` lính canh → nhiều hàm phải viết `do-while`.
-- Debug khó hơn DSLK thẳng.
+- Dễ vòng lặp vô hạn nếu quên điều kiện dừng / quên cắt vòng khi hủy.
+- Không có `NULL` lính canh → hầu hết hàm viết `do-while` + nhánh rỗng/1 nút.
+- Vòng đơn: xóa cuối vẫn $O(n)$.
+- Debug khó hơn list thẳng (in mãi một vòng trông giống treo).
 
-#### H. Ứng dụng
+**Chọn loại vòng:**
 
-| Ứng dụng | Loại vòng |
-|----------|-----------|
-| Round-robin scheduling (OS) | Vòng đơn |
-| Playlist lặp / slide show | Vòng đơn hoặc kép |
-| Buffer vòng (circular buffer) — biến thể mảng | Vòng về mặt logic |
-| Game: lượt chơi quanh bàn | Vòng đơn |
-| Josephus | Vòng đơn |
+| Nhu cầu | Chọn |
+|---------|------|
+| Round-robin, Josephus, chỉ đi tới | Vòng đơn + `pTail` |
+| Playlist Prev/Next, xóa cuối $O(1)$ | Vòng kép |
+| Buffer kích thước cố định | Mảng vòng (không phải DSLK) |
+
+---
+
+#### H. Bảng bốn loại — nhìn là chọn được
+
+| | Đơn thẳng | Kép thẳng | Vòng đơn | Vòng kép |
+|--|-----------|-----------|----------|----------|
+| Con trỏ mỗi nút | `pNext` | `pPrev` `pNext` | `pNext` | `pPrev` `pNext` |
+| Nút cuối trỏ | `NULL` | `NULL` | Head | Head |
+| Nút đầu `pPrev` | — | `NULL` | — | Tail |
+| Cửa vào | `pHead` (+`pTail`) | `pHead`+`pTail` | **`pTail`** | `head` (tail = `head->pPrev`) |
+| Duyệt | `p != NULL` | xuôi/ngược `!= NULL` | `do-while` về head | `do-while` xuôi hoặc ngược |
+| Thêm đầu / cuối | $O(1)$ / $O(1)$ | $O(1)$ / $O(1)$ | $O(1)$ / $O(1)$ | $O(1)$ / $O(1)$ |
+| Xóa cuối | $O(n)$ | $O(1)$ | $O(n)$ | $O(1)$ |
+| Thêm trước nút đang cầm | $O(n)$ | $O(1)$ | $O(n)$ | $O(1)$ |
+| Đi lùi | Không | Có | Không | Có |
+| Ứng dụng mẫu | Stack, danh sách SV | Undo, LRU, deque | Round-robin, Josephus | Playlist lặp 2 chiều |
+
+---
 
 ### ✅ Kiểm tra nhanh 3.4
 
-1. DSLK kép thắng đơn ở thao tác nào? Đánh đổi gì?
-2. Xóa nút đang cầm trên kép cần sửa những con trỏ nào (nút giữa)?
-3. Vì sao `while (p != NULL)` trên vòng chạy mãi? Viết điều kiện dừng đúng.
-4. Josephus $n=5, k=2$, người sống sót là ai (theo ví dụ trong bài)?
+1. DSLK kép thắng đơn ở **ba** thao tác nào khi đã cầm con trỏ tới nút? Đánh đổi gì?
+2. Xóa nút giữa trên kép: hai phép gán bắt buộc? Vì sao phải xét nhánh “1 nút” trước nhánh “xóa đầu”?
+3. Thêm trước nút `q` trên kép vì sao $O(1)$, trên đơn lại $O(n)$?
+4. LRU đầy: vứt nút nào, thêm nút mới vào đâu? Độ phức tạp mỗi bước (bỏ HashMap)?
+5. Vì sao vòng đơn **chỉ giữ `pTail`** chứ không chỉ giữ `pHead`?
+6. `ThemDauVong` và `ThemCuoiVong` khác nhau **đúng một dòng** nào?
+7. Vì sao `while (p != NULL)` trên vòng chạy mãi? Viết điều kiện dừng đúng. Vì sao phải `do-while` chứ không `while (p != head)`?
+8. Xóa cuối vòng đơn $O(?)$. Muốn $O(1)$ thì đổi sang loại nào?
+9. Hủy vòng: phải làm gì trước khi `while (p != NULL) delete`?
+10. Josephus $n=5, k=2$, người sống sót? $n=5, k=3$?
 
-**Đáp án:** (1) Đi lùi, xóa cuối $O(1)$, thêm trước $O(1)$; tốn thêm 1 con trỏ/nút, dễ gán sai. (2) `p->pPrev->pNext` và `p->pNext->pPrev`. (3) Không còn `NULL`; `do … while (p != head)`. (4) Người 3.
+**Đáp án:**  
+(1) Đi lùi, xóa chính nút đang cầm, xóa cuối — đều $O(1)$; tốn thêm 1 con trỏ/nút, sửa nhiều liên kết hơn, dễ lệch hai chiều.  
+(2) `p->pPrev->pNext = p->pNext` và `p->pNext->pPrev = p->pPrev`. Một nút thì `pHead->pNext` là `NULL`; gán `pHead = NULL` rồi còn `pHead->pPrev` sẽ crash.  
+(3) Kép có `q->pPrev` sẵn; đơn phải duyệt từ head tìm nút `t` với `t->pNext == q`.  
+(4) Vứt `pTail` (cũ nhất), thêm vào `pHead` (mới nhất); mỗi bước $O(1)$ trên kép.  
+(5) `pTail->pNext` chính là head → thêm đầu và thêm cuối đều chèn sau tail trong $O(1)$. Chỉ giữ head thì phải tìm last $O(n)$.  
+(6) `ThemCuoiVong` có thêm `l.pTail = p`; `ThemDauVong` không.  
+(7) Không còn `NULL`. `do { … p = p->pNext; } while (p != head)`. `while (p != head)` khi `p` đang ở head → thân vòng không chạy, bỏ hết dữ liệu.  
+(8) $O(n)$; vòng kép (hoặc kép thẳng nếu không cần tuần hoàn).  
+(9) Cắt vòng: `pTail->pNext = NULL`.  
+(10) Người 3; người 4.
 
 ---
 
@@ -2986,7 +4174,7 @@ Tính $P(x_0)$: duyệt list, `tong += coef * pow(x0, exp)`. $O(n)$.
 
 **4. Bộ nhớ hệ điều hành** — free list: các khối RAM trống xâu thành DSLK.
 
-**5. Trình duyệt, editor, LRU** — DSLK kép.
+**5. Trình duyệt, editor, LRU, deque** — DSLK kép (chi tiết chạy tay: mục 3.4.1.H). Round-robin / Josephus / playlist lặp — DSLK vòng (mục 3.4.2.F).
 
 ---
 
@@ -3285,15 +4473,17 @@ int *p = &x;
 3. **Cấp phát liên kết** (DSLK): chèn/xóa tại chỗ $O(1)$, truy cập thứ $i$ là $O(n)$.
 4. **DSLK đơn:** `NODE` + `LIST(pHead, pTail)`. Thêm đầu/cuối $O(1)$, xóa cuối $O(n)$.
 5. **Sắp xếp:** đề thi dùng **đổi chỗ trực tiếp** trên `data` — hàm `SapXep` $O(n^2)$; thực tế trên DSLK nên Merge Sort $O(n \log n)$.
-6. **DSLK kép:** thêm `pPrev` → xóa nút đang cầm và xóa cuối $O(1)$, duyệt 2 chiều, tốn RAM.
-7. **DSLK vòng:** đuôi nối đầu; duyệt bằng `do-while`; round-robin, Josephus.
+6. **DSLK kép:** mỗi nút `pPrev` + `pNext`. Thêm trước / xóa nút đang cầm / xóa cuối $O(1)$; duyệt hai chiều; tốn thêm 1 con trỏ/nút. Ứng dụng: Back/Forward, Undo/Redo, LRU, deque (mục 3.4.1).
+7. **DSLK vòng:** đuôi nắm đầu; chỉ giữ `pTail` (`head = pTail->pNext`). Duyệt `do-while`. Thêm đầu/cuối $O(1)$, **xóa cuối vòng đơn vẫn $O(n)$**. Round-robin, Josephus; vòng kép = ghép kép + vòng (mục 3.4.2).
 
 ### Câu thần chú khi viết code
 
-- Nút mới: `pNext = NULL` trước khi nối.
+- Nút mới: `pNext = NULL` trước khi nối (vòng 1 nút: `pNext = p`, tự trỏ mình).
 - Đổi liên kết: **giữ** địa chỉ phần còn lại trước khi ghi đè con trỏ.
 - Thêm/xóa: luôn xét **rỗng / một nút / nút đầu / nút cuối**.
 - Có `pTail` thì **mọi** nhánh thêm/xóa ảnh hưởng cuối phải cập nhật `pTail`.
+- Kép: mỗi mối nối sửa **hai** chiều — `a->pNext = b` kèm `b->pPrev = a`.
+- Vòng: **không** `while (p != NULL)`; hủy phải **cắt vòng** (`pTail->pNext = NULL`) rồi mới `delete`.
 - Hết việc: `HuyDanhSach`.
 
 ### Liên kết chương sau
@@ -3304,4 +4494,4 @@ int *p = &x;
 
 ---
 
-*Hết chương 3. Làm bài tập 13–19 trước khi sang chương 4; bài 20 và 26–32 là mức cao cấp.*
+*Hết chương 3. Làm bài tập 13–19 trước khi sang chương 4; bài 21–25 sau khi đọc 3.4 (kép và vòng); bài 20 và 26–32 là mức cao cấp.*
