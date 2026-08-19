@@ -791,8 +791,33 @@ Hai con đường cùng kết quả:
 | Undo | Thao tác mới nhất hủy trước |
 | Nút Back trình duyệt | Trang vừa xem là đỉnh (Forward dùng stack thứ hai / DSLK kép) |
 | DFS, quay lui (backtracking) | Đi sâu: Push; kẹt: Pop về nút trước |
-| Gọi hàm / đệ quy | Call Stack của hệ thống |
-| Duyệt cây NLR bằng vòng lặp | Mô phỏng đệ quy |
+| Gọi hàm / đệ quy | Call Stack của hệ thống — xem khung dưới |
+| Duyệt cây NLR bằng vòng lặp | Push gốc, Pop ra in, Push **phải rồi trái** (để trái ra trước) |
+
+**Call Stack — một lần gọi đệ quy trông như Push/Pop:** `GiaiThua(3)`:
+
+```
+ GiaiThua(3)  cần 3 * GiaiThua(2)     Push khung 3  (chưa nhân, chờ)
+ GiaiThua(2)  cần 2 * GiaiThua(1)     Push khung 2
+ GiaiThua(1)  = 1                     Push khung 1, trả 1, Pop
+ trở về 2:  2*1 = 2                   Pop khung 2
+ trở về 3:  3*2 = 6                   Pop khung 3
+```
+
+Đệ quy vô hạn = Push mãi không Pop → **stack overflow** (tràn *call stack*, không phải `IsFull` của `class Stack`). NLR/LNR/LRN Chương 5 chạy đúng cơ chế này: mỗi lời gọi là một khung trên call stack.
+
+NLR **không đệ quy** (dùng `class Stack` của 4.1.2, con trỏ nút):
+
+```cpp
+void NLR_Stack(TNode* root) {          // TNode: Chuong 5; y tuong nam o day
+    Stack st;                          // stack luu DIA CHI nut — thi ve la du
+    if (root == NULL) return;
+    /* gia su Push/Pop nhan TNode* ; o day chi can thu tu */
+    // Push gốc → lặp: Pop, in, Push PHẢI rồi TRÁI
+}
+```
+
+Thứ tự Push phải-trước-trái vì LIFO: trái nằm trên đỉnh → ra trước. Level-order đổi Stack thành Queue → ra 4.2.3.C / Chương 5.
 
 ---
 
@@ -963,6 +988,15 @@ Nguyên tắc: **FIFO — First In, First Out**. Vào trước, ra trước.
 ```
 
 `(rear + 1) % MAX` = “ô kế sau rear, vòng về 0 nếu đang ở cuối mảng”.
+
+**Đừng lẫn với DSLK vòng (Chương 3).** Cùng chữ “vòng”, **khác hẳn** cấu trúc:
+
+| | Hàng đợi vòng (mảng, chương này) | DSLK vòng (Chương 3) |
+|--|----------------------------------|----------------------|
+| Lưu | Mảng cố định `data[MAX]` | Nút rải Heap, `pNext` |
+| “Vòng” nghĩa là | Chỉ số `(i+1)%MAX` quay về 0 | Nút cuối **trỏ tới** nút đầu |
+| Đầy | Có — hết `MAX` ô | Không (hết RAM mới thất bại) |
+| Dùng khi | Queue đề thi, buffer kích thước kịch trần | Josephus, playlist lặp, $n$ không biết trước |
 
 #### D. Rỗng / đầy trên vòng — quy ước giáo trình
 
@@ -1238,13 +1272,84 @@ Không `IsFull`. Mọi thao tác $O(1)$ nhờ `rear`.
 
 #### C. Biến thể (nâng cao — biết để chọn đúng)
 
-**1. Deque (double-ended queue)** — thêm/xóa **cả hai** đầu. Cài DSLK kép (Chương 3) hoặc mảng vòng hai con trỏ. Ứng dụng: sliding window, palindrome, BFS 0-1.
+##### 1. Deque (double-ended queue)
 
-**2. Hàng đợi ưu tiên (Priority Queue)** — ra không theo thời điểm vào mà theo **độ ưu tiên**. Cài nhập môn: mỗi Enqueue chèn đúng chỗ trên DSLK đã sort ($O(n)$). Thực tế: heap $O(\log n)$ — gặp lại khi học cây.
+Thêm **và** xóa được ở **cả hai** đầu. Stack chỉ đụng một đầu; Queue đụng hai đầu nhưng mỗi đầu một việc (vào rear, ra front). Deque = “hai đầu đều được vào/ra”.
+
+```
+  PushFront / PopFront              PushBack / PopBack
+           │                                │
+           ▼                                ▼
+        ┌────┐    ┌────┐    ┌────┐    ┌────┐
+        │ 10 │◄──►│ 20 │◄──►│ 30 │◄──►│ 40 │
+        └────┘    └────┘    └────┘    └────┘
+         đầu                               cuối
+```
+
+| Thao tác | Ý | Cài DSLK kép (Ch.3) |
+|----------|---|---------------------|
+| `PushFront(x)` | Thêm đầu | `ThemDauKep` $O(1)$ |
+| `PushBack(x)` | Thêm cuối | `ThemCuoiKep` $O(1)$ |
+| `PopFront()` | Xóa đầu | `XoaDauKep` $O(1)$ |
+| `PopBack()` | Xóa cuối | `XoaCuoiKep` $O(1)$ |
+
+DSLK đơn **thất bại** ở `PopBack` ($O(n)$). Mảng vòng cũng cài được: `front` lùi bằng `(front-1+MAX)%MAX`.
+
+**Palindrome bằng deque:** so hai đầu, bóc dần. `"abcba"`: so a=a, còn `bcb`; so b=b, còn `c`; một ký tự → đúng.
+
+```
+ PushBack từng ký tự → deque: a b c b a
+ PopFront a  vs  PopBack a   khớp
+ PopFront b  vs  PopBack b   khớp
+ còn c → palindrome
+```
+
+Stack một mình cũng kiểm palindrome (mục 4.1.3.G) nhưng phải duyệt chuỗi **hai lần** (một lần Push, một lần so). Deque so tại chỗ.
+
+##### 2. Hai Stack giả lập một Queue
+
+FIFO dựng từ hai LIFO: `in` nhận Enqueue, `out` phát Dequeue.
+
+```
+ Enqueue(x)  =  in.Push(x)
+
+ Dequeue():
+   nếu out rỗng thì đổ hết in sang out   (đảo thứ tự)
+   return out.Pop()
+```
+
+```
+ Enqueue 10, 20, 30
+   in:  10 20 30  (đỉnh 30)     out: (rỗng)
+
+ Dequeue → phải ra 10
+   đổ in → out:  out đỉnh = 10, rồi 20, rồi 30
+   Pop out = 10
+   in rỗng, out còn 20 30 (đỉnh 20)
+
+ Enqueue 40
+   in: 40                   out: 20 30 (đỉnh 20)
+ Dequeue → Pop out = 20     (không đụng in)
+```
+
+Mỗi phần tử bị Push/Pop **tối đa hai lần** → tổng amortized $O(1)$. Đề thi đôi khi hỏi “cài Queue bằng hai Stack” — đây là hình cần vẽ.
+
+##### 3. Hàng đợi ưu tiên (Priority Queue)
+
+Ra **không** theo thời điểm vào mà theo **độ ưu tiên**. Cài nhập môn: mỗi Enqueue chèn đúng chỗ trên DSLK đã sort ($O(n)$). Thực tế: heap $O(\log n)$ — gặp lại khi học cây (Ch.5, heap vs BST).
 
 ```
  Hàng thường:   vào  A, B, C     ra  A, B, C
  Ưu tiên:       A(2), B(9), C(5)  ra  B, C, A     (9 > 5 > 2)
+```
+
+**Chạy tay** Enqueue A(2), B(9), C(5) — list luôn giảm theo `uuTien`:
+
+```
+ A(2)                 [A2]
+ B(9) > A → đầu       [B9]→[A2]
+ C(5): 9≥5≥2 → giữa   [B9]→[C5]→[A2]
+ Dequeue              ra B, còn [C5]→[A2]
 ```
 
 ```cpp
@@ -1284,8 +1389,10 @@ int DequeueUuTien(PNode* &head) {     // luon la head
 2. Vì sao Queue mảng thẳng bị “đầy giả”?
 3. `(rear+1)%MAX == front` nghĩa là gì?
 4. Dequeue nút duy nhất trên DSLK, quên gán `rear = NULL` thì sao?
+5. Hàng đợi vòng (mảng) khác DSLK vòng chỗ nào?
+6. Enqueue 10,20,30 bằng hai Stack (`in`/`out`), Dequeue một lần. Ra số nào? `out` còn gì?
 
-**Đáp án:** (1) 2. (2) `front`/`rear` chỉ tăng, ô trước `front` bỏ phí. (3) Ô kế rear trùng front → đầy. (4) `rear` dangling; Enqueue sau crash.
+**Đáp án:** (1) 2. (2) `front`/`rear` chỉ tăng, ô trước `front` bỏ phí. (3) Ô kế rear trùng front → đầy. (4) `rear` dangling; Enqueue sau crash. (5) Vòng mảng = chỉ số `% MAX`; DSLK vòng = nút cuối trỏ đầu. (6) Ra 10; `out` đỉnh 20 rồi 30.
 
 ---
 
@@ -1322,12 +1429,21 @@ Mỗi tiến trình được một **quantum**. Chưa xong → Enqueue lại cu�
 
 ```
  P1(5) P2(3) P3(4)   quantum = 2
+ Hàng ban đầu (front → rear):  P1 P2 P3
 
- P1 chạy 2, còn 3 → vào lại cuối:  P2 P3 P1
- P2 chạy 2, còn 1 → vào lại:       P3 P1 P2
- P3 chạy 2, còn 2 → vào lại:       P1 P2 P3
- ...
+ Lát  Việc     Chạy   Còn   t    Hàng sau lát
+  1   P1       2      3     2    P2 P3 P1      (chưa xong → vào lại cuối)
+  2   P2       2      1     4    P3 P1 P2
+  3   P3       2      2     6    P1 P2 P3
+  4   P1       2      1     8    P2 P3 P1
+  5   P2       1      0     9    P3 P1         (xong — KHÔNG vào lại)
+  6   P3       2      0    11    P1            (xong)
+  7   P1       1      0    12    (rỗng)
+
+ Thứ tự hoàn thành: P2, P3, P1. Tổng thời gian = 5+3+4 = 12.
 ```
+
+Khác FIFO thuần: một việc có thể **ra–vào nhiều lần**. Khác DSLK vòng Chương 3: ở đây “vòng” là *người chưa xong xuống cuối hàng* (Enqueue lại), cài bằng `class Queue` — không cần `pTail->pNext = head`.
 
 ```cpp
 struct Process { int id, conLai; };
@@ -1535,6 +1651,8 @@ Làm theo thứ tự. Viết mã giả trước khi gõ. Không nhìn code mẫu
 
 **Bài 24 (nâng cao).** Undo/Redo hai Stack. Gõ chuỗi lệnh `GO x` / `UNDO` / `REDO`.
 
+**Bài 25 (nâng cao).** Cài Queue bằng **hai Stack** `in`/`out` đúng mục 4.2.2.C. Test Enqueue 1,2,3, Dequeue, Enqueue 4, Dequeue hết — phải ra 1,2,3,4.
+
 ### E. Tự luận / kiểm tra miệng
 
 1. Trình bày ADT Stack, cài mảng, phân tích $O$. Một ứng dụng, chạy tay.
@@ -1573,6 +1691,7 @@ Làm theo thứ tự. Viết mã giả trước khi gõ. Không nhìn code mẫu
 - In Queue vòng: đi từ `front` bằng `%` đến `rear`, không `i <= rear`.
 - Ngoặc: hết chuỗi mà stack còn phần tử → thiếu đóng.
 - Tính biểu thức: Pop **b** (phải) rồi **a** (trái); `*` `/` trước `+` `-`.
+- “Vòng” Queue = `% MAX` trên mảng, **không** phải `pNext` của DSLK vòng.
 
 ### Liên kết chương
 

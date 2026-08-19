@@ -27,8 +27,9 @@
      5.2.1. Định nghĩa và tính chất
      5.2.2. Biểu diễn cây nhị phân
      5.2.3. Các phép toán trên cây nhị phân
-            – Duyệt cây (NLR, LNR, LRN)
-            – Tính số nút, số lá, chiều cao
+            – Duyệt cây (NLR, LNR, LRN, tầng, NLR không đệ quy)
+            – Tính số nút, số lá, chiều cao, copy, đếm mức
+            – Cây biểu thức (hậu tố → cây)
 5.3. Cây nhị phân tìm kiếm (BST)
      5.3.1. Định nghĩa
      5.3.2. Các phép toán trên cây nhị phân tìm kiếm
@@ -180,7 +181,7 @@ Trái = con đầu; phải = anh em kế. Học xong 5.2 là đủ để lưu c�
 2. Gốc có phải lá được không?
 3. Cây 1 nút: mức gốc? chiều cao (quy ước chương này)?
 
-**Đáp án:** (1) Không — phá định nghĩa cây (thành đồ thị có hướng, có thể có chu trình). (2) Được — cây 1 nút: gốc đồng thời là lá. (3) Mức 1; chiều cao 1.
+**Đáp án:** (1) Không — cây yêu cầu mỗi nút (trừ gốc) **đúng một** cha. Hai cha → thành đồ thị, không còn là cây. (2) Được — cây 1 nút: gốc đồng thời là lá. (3) Mức 1; chiều cao 1.
 
 ---
 
@@ -227,6 +228,16 @@ Trái = con đầu; phải = anh em kế. Học xong 5.2 là đủ để lưu c�
 ```
 
 Heap (hàng đợi ưu tiên Chương 4) cài bằng **cây hoàn chỉnh + mảng**. BST không yêu cầu hoàn chỉnh.
+
+> **Thuật ngữ — dễ lệch sách Việt / sách Anh.** Khóa này dùng đúng tên tiếng Anh trong ngoặc, đừng đổi chữ:
+>
+> | Tên trong chương | Tiếng Anh | Ý | Sách Việt đôi khi gọi |
+> |------------------|-----------|---|------------------------|
+> | **Đầy** | *full* | Mỗi nút **0 hoặc 2** con, không nút 1 con | “đầy đủ” — **lẫn** với perfect |
+> | **Hoàn chỉnh** | *complete* | Lấp các mức trái → phải, mức cuối có thể thiếu bên phải | đúng “hoàn chỉnh” (dáng heap) |
+> | **Perfect** | *perfect* | Mọi mức **đầy**, $n = 2^h-1$ | nhiều giáo trình gọi là “đầy đủ” |
+>
+> Cây perfect **luôn** complete và full. Cây full **không** nhất thiết perfect (hình “đầy” 5 nút ở trên). Đề thi hỏi “cây hoàn chỉnh” → dáng heap; hỏi “mọi lá cùng mức, đủ 2 con” → perfect.
 
 #### C. Tính chất (nhớ để tính nhanh)
 
@@ -649,6 +660,37 @@ Bốn cách trên cùng cây 1..6:
  Level       1 2 3 4 5 6     rộng, trên → dưới
 ```
 
+**NLR không đệ quy — Stack Chương 4.** LIFO: Push gốc; lặp Pop → in → Push **phải rồi trái** (trái nằm đỉnh → ra trước).
+
+```
+ Cây 1..6
+ Push 1
+ Pop 1 in; Push 3, Push 2          stack (đỉnh→): 2 3
+ Pop 2 in; Push 5, Push 4          stack: 4 5 3
+ Pop 4 in                          stack: 5 3
+ Pop 5 in                          stack: 3
+ Pop 3 in; Push 6                  stack: 6
+ Pop 6 in
+ → 1 2 4 5 3 6   (đúng NLR)
+```
+
+```cpp
+void NLR_KhuDeQuy(TNode* root) {    // mang dong vai Stack TNode*
+    if (root == NULL) return;
+    TNode* st[100];
+    int top = -1;
+    st[++top] = root;
+    while (top >= 0) {
+        TNode* p = st[top--];
+        cout << p->data << " ";
+        if (p->pRight != NULL) st[++top] = p->pRight;  // phai TRUOC
+        if (p->pLeft  != NULL) st[++top] = p->pLeft;   // trai sau → ra truoc
+    }
+}
+```
+
+LNR không đệ quy cần thêm “đánh dấu đã xong trái” (hoặc con trỏ phụ) — đề thi ít bắt; thuộc bản đệ quy là đủ. Level-order **không** thay Stack vào chỗ Queue.
+
 ---
 
 #### C. Số nút, số lá, chiều cao
@@ -691,6 +733,37 @@ Cây 1..6: nút = 6, lá = 3, chiều cao = 3.
 
 **Bẫy chiều cao:** `return -1` khi rỗng thì lá = 0, cây đề thi ra **3** chứ không phải 4. Chấm thực hành theo đề: **rỗng = 0**.
 
+**Sao chép cây** — dùng NLR: tạo nút gốc trước, rồi gắn hai cây con (đã copy).
+
+```cpp
+TNode* CopyTree(TNode* root) {
+    if (root == NULL) return NULL;
+    TNode* p = TaoNode(root->data);     // N
+    p->pLeft  = CopyTree(root->pLeft);  // L
+    p->pRight = CopyTree(root->pRight); // R
+    return p;
+}
+```
+
+**Đếm nút mức $k$** (gốc mức 1 — khớp quy ước chương):
+
+```
+THUẬT TOÁN DemMuc(p, k) → số nút
+1. nếu p = NULL hoặc k < 1 thì trả về 0
+2. nếu k = 1 thì trả về 1
+3. trả về DemMuc(p.pLeft, k-1) + DemMuc(p.pRight, k-1)
+```
+
+```cpp
+int DemMuc(TNode* root, int k) {
+    if (root == NULL || k < 1) return 0;
+    if (k == 1) return 1;
+    return DemMuc(root->pLeft, k - 1) + DemMuc(root->pRight, k - 1);
+}
+```
+
+Cây 1..6: mức 1 → 1 nút; mức 2 → 2; mức 3 → 3. $O(n)$.
+
 ---
 
 #### D. Hủy cây — phải LRN
@@ -719,8 +792,81 @@ $O(n)$. Gọi trước khi chương trình kết thúc (giống `HuyDanhSach` Ch
 | Level-order | $O(n)$ | $O(n)$ rộng nhất | Queue |
 | CountNodes / Leaves / Height | $O(n)$ | $O(h)$ | |
 | HuyCay | $O(n)$ | $O(h)$ | LRN |
+| CopyTree | $O(n)$ | $O(h)$ | NLR tạo nút |
+| DemMuc | $O(n)$ | $O(h)$ | gốc mức 1 |
+| NLR không đệ quy | $O(n)$ | $O(n)$ | Stack, Push phải rồi trái |
 
 Cây nhị phân **không thứ tự**: tìm một giá trị phải duyệt hết — $O(n)$. Muốn $O(h)$ → BST.
+
+---
+
+#### F. Cây biểu thức — cầu nối Chương 4
+
+Mỗi toán tử là nút trong, mỗi số là lá. LNR = trung tố (cần ngoặc), LRN = hậu tố, NLR = tiền tố.
+
+```
+ Trung tố:  (3+4)*5
+ Hậu tố:    3 4 + 5 *
+ Tiền tố:   * + 3 4 5
+
+            *
+           / \
+          +   5
+         / \
+        3   4
+```
+
+**Dựng cây từ hậu tố** — một Stack **cây** (ý như `TinhHauTo`, nhưng Push nút thay vì số):
+
+```
+ Gặp số      → tạo lá, Push
+ Gặp toán tử → Pop phải, Pop trái, tạo nút op, gắn hai con, Push nút đó
+```
+
+```
+ Token   Stack (đỉnh →)
+ 3       [3]
+ 4       [4  3]
+ +       Pop 4, Pop 3 → nút + ; Push (+)     stack: [+]
+ 5       [5  +]
+ *       Pop 5, Pop (+) → nút * ; Push (*)    stack: [*]  ← gốc
+```
+
+```cpp
+// Gia su toan hang 1 chu so; TNode->data luu ma ASCII cua so hoac toan tu
+TNode* CayTuHauTo(string postfix) {
+    TNode* st[100];
+    int top = -1;
+    for (int i = 0; i < (int)postfix.size(); i++) {
+        char c = postfix[i];
+        if (c == ' ') continue;
+        TNode* p = TaoNode((int)c);
+        if (c == '+' || c == '-' || c == '*' || c == '/') {
+            p->pRight = st[top--];   // Pop phai truoc
+            p->pLeft  = st[top--];   // roi trai
+        }
+        st[++top] = p;
+    }
+    return (top >= 0) ? st[top] : NULL;
+}
+
+int TinhCay(TNode* p) {            // LRN: hai con xong moi tinh goc
+    if (p == NULL) return 0;
+    if (p->pLeft == NULL && p->pRight == NULL)
+        return p->data - '0';      // la so
+    int a = TinhCay(p->pLeft);
+    int b = TinhCay(p->pRight);
+    char op = (char)p->data;
+    if (op == '+') return a + b;
+    if (op == '-') return a - b;
+    if (op == '*') return a * b;
+    return a / b;
+}
+```
+
+`TinhCay(CayTuHauTo("3 4 + 5 *"))` = 35. Cùng kết quả `TinhHauTo` Chương 4, nhưng cây **giữ cấu trúc** để in lại trung tố / tối ưu biểu thức.
+
+---
 
 ### ✅ Kiểm tra nhanh 5.2
 
@@ -729,8 +875,9 @@ Cây nhị phân **không thứ tự**: tìm một giá trị phải duyệt h�
 3. $n_0=5$. $n_2$?
 4. Perfect 3 mức: bao nhiêu nút? Bao nhiêu lá?
 5. Vì sao hủy cây không dùng NLR? Level-order dùng cấu trúc nào Chương 4?
+6. Cây 1..6, `DemMuc(..., 3)`? NLR không đệ quy Push con theo thứ tự nào?
 
-**Đáp án:** (1) NLR `1 2 3`; LNR `2 1 3`; LRN `2 3 1`; tầng `1 2 3`. (2) Lúc ② — xong trái, chưa sang phải. (3) 4. (4) 7 nút, 4 lá. (5) NLR `delete` gốc trước → mất con; tầng dùng **Queue**.
+**Đáp án:** (1) NLR `1 2 3`; LNR `2 1 3`; LRN `2 3 1`; tầng `1 2 3`. (2) Lúc ② — xong trái, chưa sang phải. (3) 4. (4) 7 nút, 4 lá. (5) NLR `delete` gốc trước → mất con; tầng dùng **Queue**. (6) 3 nút (4, 5, 6); Push **phải rồi trái**.
 
 ---
 
@@ -879,6 +1026,18 @@ TNode* SearchIter(TNode* root, int x) {      // vong lap, O(1) phu
 
 $O(h)$. Bản vòng không tốn Call Stack — nên dùng khi $h$ có thể lớn.
 
+**Max / Min trên BST** — không cần duyệt hết: min = trái nhất, max = phải nhất (cùng `MinValueNode` lúc xóa).
+
+```cpp
+TNode* MaxValueNode(TNode* p) {
+    while (p != NULL && p->pRight != NULL)
+        p = p->pRight;
+    return p;
+}
+```
+
+Cây đề thi 11 nút: min = 10, max = 80. Cây **không** BST thì min/max phải duyệt $O(n)$ — đừng dùng hàm này.
+
 **Bẫy:** tìm trên cây **không** BST mà viết `Search` kiểu này → sai (bỏ nhánh có thể chứa khóa).
 
 ---
@@ -929,9 +1088,9 @@ TNode* Delete(TNode* root, int x) {
 
 Hai nhánh 0/1 con gộp: không trái ⇒ thay bằng phải (phải có thể NULL = lá). Không phải ⇒ thay bằng trái.
 
-**Chạy tay trên cây đề thi.**
+**Chạy tay trên cây đề thi** — ba case **tách** nhau (mỗi case xuất phát từ cây 11 nút đầy đủ, trừ khi ghi rõ “sau khi đã xóa …”).
 
-*Xóa lá 10:*
+*Xóa lá 10 (0 con):* `20->pLeft` thành `NULL`.
 
 ```
      20               20
@@ -939,9 +1098,17 @@ Hai nhánh 0/1 con gộp: không trái ⇒ thay bằng phải (phải có thể 
   10   25                25
 ```
 
-*Xóa 20 (một con — lúc này chỉ còn 25):* 30.pLeft nhảy từ 20 sang 25.
+*Xóa 20 (1 con) — **sau khi đã xóa 10**, 20 chỉ còn con phải 25:* `30->pLeft` nhảy từ 20 sang 25.
 
-*Xóa 30 (hai con).* Cây con phải của 30 gốc 40; min = **35**. Copy 35 vào chỗ 30, xóa 35 (lá, trái của 40):
+```
+    30                  30
+   /                   /
+ 20           →      25
+   \
+   25
+```
+
+*Xóa 30 (hai con) trên cây **đầy đủ 11 nút** (chưa xóa 10, 20).* Cây con phải của 30 gốc 40; min = **35**. Copy 35 vào chỗ 30, xóa 35 (lá, trái của 40):
 
 ```
  TRƯỚC                         SAU
@@ -993,6 +1160,18 @@ $O(h)$.
 ```
 
 Cùng dữ liệu Chương 3 `SapXep`, khác cấu trúc.
+
+**BST ≠ Heap.** Đừng nhầm “cây có thứ tự” với “con nhỏ hơn cha”:
+
+| | BST | Heap (max-heap, Ch.2 HeapSort) |
+|--|-----|--------------------------------|
+| Thứ tự | Trái < gốc < phải (mọi tổ tiên) | Cha ≥ hai con; **không** so trái–phải |
+| Dáng | Tùy dữ liệu, có thể suy biến | **Hoàn chỉnh** (complete) |
+| Tìm một khóa | $O(h)$ | $O(n)$ — phải duyệt |
+| Lấy min/max | Trái nhất / phải nhất $O(h)$ | Max = gốc $O(1)$; xóa max $O(\log n)$ |
+| Cài | `TNode` liên kết | Mảng, `cha = i/2` |
+
+Heap **không** phải BST: `[90, 40, 70]` là max-heap hợp lệ (90 trên, 40 trái, 70 phải) nhưng 40 < 90 mà 70 cũng < 90 — 40 nằm trái, 70 phải, **không** thỏa trái < gốc < phải.
 
 **IsBST** (nâng cao — đừng chỉ so với cha):
 
@@ -1842,7 +2021,7 @@ Làm theo thứ tự. Vẽ cây trước khi gõ.
 
 **Bài 16.** Tree sort: nhập $n$ số, Insert BST, LNR.
 
-**Bài 17.** `CountLeaves`, `LevelOrder` (Queue Chương 4 hoặc mảng).
+**Bài 17.** `CountLeaves`, `LevelOrder` (Queue Chương 4 hoặc mảng), `DemMuc(root, k)`, `CopyTree`.
 
 **Bài 18.** `IsBST` (kèm min/max). Cây cố ý sai (6 nằm trái 5) phải ra false.
 
@@ -1850,7 +2029,7 @@ Làm theo thứ tự. Vẽ cây trước khi gõ.
 
 **Bài 20 (nâng cao).** Xóa AVL; `isAVL` sau mỗi lần xóa.
 
-**Bài 21 (nâng cao).** Cây biểu thức: nút toán tử / số; LRN ra hậu tố; tính giá trị (Chương 4).
+**Bài 21 (nâng cao).** Cây biểu thức: dựng từ hậu tố `3 4 + 5 *` (Stack nút), LRN ra hậu tố, `TinhCay` = 35. Đối chiếu `TinhHauTo` Chương 4.
 
 ### E. Tự luận
 
@@ -1881,8 +2060,9 @@ Làm theo thứ tự. Vẽ cây trước khi gõ.
 2. **Biểu diễn đề thi:** `TNode` + `pLeft` / `pRight`. Mảng cho cây hoàn chỉnh.
 3. **Duyệt:** NLR sao chép; LNR (BST → tăng); LRN hủy / hậu tố. Tầng = Queue.
 4. **Chiều cao đề thi:** rỗng = 0, lá = 1. Cây 11 nút mẫu → cao **4**.
-5. **BST:** trái < gốc < phải. Insert / Search / Delete $O(h)$. Xóa 2 con: min cây con phải.
+5. **BST:** trái < gốc < phải. Insert / Search / Delete $O(h)$. Xóa 2 con: min cây con phải. Min = trái nhất, max = phải nhất. **Không** nhầm heap.
 6. **AVL:** BST + \|BF\| ≤ 1, BF = cao phải − cao trái. Bốn xoay LL / RR / LR / RL. $O(\log n)$ luôn.
+7. **Cây biểu thức:** toán tử = nút trong, số = lá; LRN = hậu tố. Dựng từ hậu tố bằng Stack nút (Ch.4).
 
 ### Câu thần chú khi viết code
 
@@ -1895,6 +2075,7 @@ Làm theo thứ tự. Vẽ cây trước khi gõ.
 - LNR không tăng → **không** phải BST (hoặc vừa xóa sai).
 - Duyệt: ve ①②③ trên giấy — NLR in lúc tới, LNR lúc xong trái, LRN lúc rời nút.
 - AVL: đường thẳng (LL/RR) một xoay; đường gãy (LR/RL) **xoay con trước**, rồi xoay $z$. Giữ T2. Height: con trước cha.
+- “Đầy / hoàn chỉnh / perfect” khác nhau — xem hộp thuật ngữ 5.2.1.B. Heap là complete trên mảng, không phải BST.
 
 ### Liên kết chương
 
