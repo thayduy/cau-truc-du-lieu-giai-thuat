@@ -2733,14 +2733,57 @@ $O(1)$ với `pTail`. Không có `pTail` thì thêm cuối vẫn $O(n)$ — ph�
       └────┴────┴────┘   └────┴────┴────┘   └────┴────┴────┘
                            q
 
+ ┌─────────────────────────────────────────────────────────────────┐
+ │  HIỂU CÚ PHÁP TRƯỚC KHI ĐỌC CÁC BƯỚC                         │
+ │                                                                 │
+ │  p->pNext = q->pNext  đọc từ PHẢI sang TRÁI:                   │
+ │                                                                 │
+ │    q->pNext  =  "lấy địa chỉ đang chứa trong ô pNext của q"   │
+ │                  → q là nút 20, q->pNext đang GIỮ địa chỉ 30  │
+ │                                                                 │
+ │    p->pNext  =  "ghi địa chỉ đó vào ô pNext của p"            │
+ │                  → p là nút 25 mới, pNext của 25 = địa chỉ 30 │
+ │                                                                 │
+ │  Kết quả: cả 20 và 25 đều "biết" chỗ của 30.                  │
+ │  (Không viết p->pNext = 30 vì 30 là giá trị dữ liệu,          │
+ │   địa chỉ của nút 30 chỉ q->pNext mới đang giữ.)              │
+ │                                                                 │
+ │  Hình dung: A(20) đang cầm số ĐT của C(30).                   │
+ │  B(25) mới vào → hỏi A: "cho tao số C" = p->pNext = q->pNext  │
+ │  Bây giờ cả A và B đều có số của C.                            │
+ │  Sau đó A xóa số C, lưu số B = q->pNext = p  (bước ③)        │
+ │  B vẫn còn số C → chuỗi không bị đứt.                         │
+ └─────────────────────────────────────────────────────────────────┘
+
+ Cách nhớ: "nút MỚI (25) lo xong việc của mình TRƯỚC,
+ rồi mới bảo các nút CŨ cập nhật lại":
+
+   Bước ①②  → nút 25 tự nối hai đầu của mình vào đúng vị trí
+   Bước ③④  → nút 20 và nút 30 "quay sang" nhận 25 là hàng xóm mới
+
+ Vì sao ① phải trước ③?
+   Nếu làm ③ trước (q->pNext = p), thì q->pNext bị ghi đè = 25,
+   mất luôn địa chỉ 30. Bước ① không còn biết 30 ở đâu → chuỗi đứt.
+   → Luôn "cầm địa chỉ 30" (①) trước khi "cắt dây 20→30" (③).
+
  Thứ tự BẮT BUỘC — giữ 30 trước khi cắt 20.next:
- ① p->pNext = q->pNext      (25 nắm 30)
- ② p->pPrev = q             (25.prev = 20)
- ③ q->pNext = p             (20 nắm 25)
- ④ nếu p->pNext ≠ NULL
-       p->pNext->pPrev = p  (30.prev = 25)
-    ngược lại
-       pTail = p            (q là tail cũ, 25 thành đuôi)
+
+ Trạng thái ban đầu:     10 ←→ [20] ←→ 30       p=25 lơ lửng
+                                  q
+
+ ① p->pNext = q->pNext   10 ←→ [20] ←→ 30
+   (25 nắm địa chỉ 30)            q        ↑
+                                  [25]─────┘   25.next → 30
+
+ ② p->pPrev = q          10 ←→ [20] ←→ 30
+   (25.prev = địa chỉ 20)         q        ↑
+                         20 ←─ [25]────────┘   25 hai chiều xong
+
+ ③ q->pNext = p          10 ←→ [20] ──► [25] ──► 30
+   (20 trỏ sang 25)               q       p     20 đã trỏ 25
+
+ ④ p->pNext->pPrev = p   10 ←→ [20] ←→ [25] ←→ 30   ✓ hoàn chỉnh
+   (30.prev = địa chỉ 25)         q       p
 
  SAU
       ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐  ┌────┬────┬────┐
