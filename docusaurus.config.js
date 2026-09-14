@@ -117,6 +117,11 @@ const config = {
             label: 'Lý thuyết',
           },
           {
+            to: '/bai-kiem-tra',
+            label: 'Bài kiểm tra',
+            position: 'left',
+          },
+          {
             href: 'https://github.com/thayduy/cau-truc-du-lieu-giai-thuat',
             label: 'GitHub',
             position: 'right',
@@ -132,6 +137,10 @@ const config = {
               {
                 label: 'Lý thuyết',
                 to: '/',
+              },
+              {
+                label: 'Bài kiểm tra 200 câu',
+                to: '/bai-kiem-tra',
               },
             ],
           },
