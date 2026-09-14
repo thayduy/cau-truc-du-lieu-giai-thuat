@@ -122,6 +122,11 @@ const config = {
             position: 'left',
           },
           {
+            to: '/bang-diem',
+            label: 'Bảng điểm',
+            position: 'left',
+          },
+          {
             href: 'https://github.com/thayduy/cau-truc-du-lieu-giai-thuat',
             label: 'GitHub',
             position: 'right',
@@ -141,6 +146,10 @@ const config = {
               {
                 label: 'Bài kiểm tra 200 câu',
                 to: '/bai-kiem-tra',
+              },
+              {
+                label: 'Bảng điểm',
+                to: '/bang-diem',
               },
             ],
           },

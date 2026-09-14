@@ -51,6 +51,20 @@ export function isAnswered(q, pick) {
   return pick != null && pick !== '';
 }
 
+export function computeStats(items, picks, diemMoiCau) {
+  let correct = 0;
+  const byChap = {1: {ok: 0, total: 0}, 2: {ok: 0, total: 0}, 3: {ok: 0, total: 0}, 4: {ok: 0, total: 0}};
+  items.forEach((q, i) => {
+    byChap[q.chapter].total += 1;
+    if (isCorrect(q, picks[i])) {
+      correct += 1;
+      byChap[q.chapter].ok += 1;
+    }
+  });
+  const score = Math.round(correct * diemMoiCau * 10) / 10;
+  return {correct, score, byChap};
+}
+
 export function isCorrect(q, pick) {
   const type = q?.type || 'single';
   if (type === 'fill') {

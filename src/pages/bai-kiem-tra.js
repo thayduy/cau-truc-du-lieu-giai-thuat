@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Layout from '@theme/Layout';
 import {ExamFigure, FIGURE_BY_ID} from '../components/ExamFigures';
 import {
@@ -11,7 +11,8 @@ import {
   TONG_DIEM,
   TYPE_LABEL,
 } from '../data/cau-hoi';
-import {isAnswered, isCorrect, mixQuestions} from '../data/exam-utils';
+import {computeStats, isAnswered, isCorrect, mixQuestions} from '../data/exam-utils';
+import {buildResult, captureApiFromQuery, getApiUrl, nopBaiLenBang} from '../data/ket-qua';
 import styles from './bai-kiem-tra.module.css';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -54,6 +55,9 @@ export default function BaiKiemTraPage() {
   const [now, setNow] = useState(Date.now());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
+  const [nopStatus, setNopStatus] = useState('');
+  const [hasApi, setHasApi] = useState(false);
+  const submittedRef = useRef(false);
 
   const remaining = Math.max(0, endsAt - now);
   const answeredCount = items.filter((q, i) => isAnswered(q, picks[i])).length;
@@ -77,6 +81,8 @@ export default function BaiKiemTraPage() {
   );
 
   useEffect(() => {
+    captureApiFromQuery();
+    setHasApi(!!getApiUrl());
     const draft = loadDraft();
     if (!draft?.items?.length) return;
     if (draft.phase === 'exam' && draft.endsAt > Date.now()) {
@@ -98,6 +104,7 @@ export default function BaiKiemTraPage() {
       setEndsAt(draft.endsAt || 0);
       setStartedAt(draft.startedAt || 0);
       setPhase('result');
+      submittedRef.current = true;
     }
   }, []);
 
@@ -123,8 +130,15 @@ export default function BaiKiemTraPage() {
       setPhase('result');
       persist({phase: 'result'});
       if (auto) setError('Hết giờ — hệ thống đã nộp bài tự động.');
+      if (submittedRef.current) return;
+      submittedRef.current = true;
+      const row = buildResult({hoTen, mssv, items, picks, startedAt, auto});
+      setNopStatus('sending');
+      nopBaiLenBang(row)
+        .then((r) => setNopStatus(r.localOnly ? 'local' : 'ok'))
+        .catch(() => setNopStatus('loi'));
     },
-    [persist],
+    [persist, hoTen, mssv, items, picks, startedAt],
   );
 
   useEffect(() => {
@@ -195,19 +209,7 @@ export default function BaiKiemTraPage() {
     persist({flags: next});
   };
 
-  const stats = useMemo(() => {
-    let correct = 0;
-    const byChap = {1: {ok: 0, total: 0}, 2: {ok: 0, total: 0}, 3: {ok: 0, total: 0}, 4: {ok: 0, total: 0}};
-    items.forEach((q, i) => {
-      byChap[q.chapter].total += 1;
-      if (isCorrect(q, picks[i])) {
-        correct += 1;
-        byChap[q.chapter].ok += 1;
-      }
-    });
-    const score = Math.round(correct * DIEM_MOI_CAU * 10) / 10;
-    return {correct, score, byChap};
-  }, [items, picks]);
+  const stats = useMemo(() => computeStats(items, picks, DIEM_MOI_CAU), [items, picks]);
 
   const q = items[index];
   const review = phase === 'result';
@@ -292,6 +294,10 @@ export default function BaiKiemTraPage() {
                   <li>Không tài liệu, máy tính, AI. Hết 180 phút nộp tự động.</li>
                   <li>Tải lại trang vẫn giữ bài nếu chưa hết giờ. Gắn cờ để xem lại.</li>
                   <li>Xếp loại: 8,5 xuất sắc · 7,0 giỏi · 5,5 khá · 4,0 trung bình.</li>
+                  <li>
+                    Nộp bài ghi họ tên, MSSV, điểm lên bảng giảng viên
+                    {hasApi ? ' (đã kết nối).' : ' khi dùng đúng link từ trang Bảng điểm.'}
+                  </li>
                 </ol>
               </article>
               <article className={styles.card}>
@@ -335,6 +341,8 @@ export default function BaiKiemTraPage() {
                   type="button"
                   onClick={() => {
                     localStorage.removeItem(STORAGE_KEY);
+                    submittedRef.current = false;
+                    setNopStatus('');
                     setPhase('intro');
                     setItems([]);
                     setError('');
@@ -349,6 +357,32 @@ export default function BaiKiemTraPage() {
                 {error && <p className={styles.notice}>{error}</p>}
                 <div className={styles.mark}>{stats.score.toFixed(1)}</div>
                 <div>/ {TONG_DIEM} điểm · {rankOf(stats.score)}</div>
+                {nopStatus === 'sending' && <p className={styles.typeHint}>Đang gửi điểm lên bảng giảng viên…</p>}
+                {nopStatus === 'ok' && <p className={styles.nopOk}>Đã ghi nhận trên bảng điểm (họ tên, MSSV, điểm).</p>}
+                {nopStatus === 'local' && (
+                  <p className={styles.nopWarn}>
+                    Đã lưu trên máy này. Để vào danh sách lớp, sinh viên phải mở đúng link làm bài thầy gửi từ trang Bảng điểm.
+                  </p>
+                )}
+                {nopStatus === 'loi' && (
+                  <p className={styles.notice}>
+                    Gửi bảng điểm thất bại.{' '}
+                    <button
+                      type="button"
+                      className={`${styles.ghostBtn} ${styles.btnAuto}`}
+                      onClick={() => {
+                        submittedRef.current = false;
+                        const row = buildResult({hoTen, mssv, items, picks, startedAt, auto: false});
+                        submittedRef.current = true;
+                        setNopStatus('sending');
+                        nopBaiLenBang(row)
+                          .then((r) => setNopStatus(r.localOnly ? 'local' : 'ok'))
+                          .catch(() => setNopStatus('loi'));
+                      }}>
+                      Gửi lại
+                    </button>
+                  </p>
+                )}
                 <div className={styles.bars}>
                   {[1, 2, 3, 4].map((c) => {
                     const row = stats.byChap[c];

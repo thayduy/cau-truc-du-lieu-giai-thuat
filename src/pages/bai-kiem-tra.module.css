@@ -542,3 +542,74 @@
   max-width: 420px;
   width: 100%;
 }
+
+.btnAuto {
+  width: auto !important;
+}
+
+.okNote {
+  color: var(--exam-ok);
+  font-size: 0.88rem;
+  margin: 0.5rem 0 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.7rem 0 0.9rem;
+}
+
+.search {
+  flex: 1 1 180px;
+  border: 1px solid var(--exam-line);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  background: var(--ifm-background-color);
+  color: inherit;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--exam-line);
+  padding: 0.55rem 0.45rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.nopOk {
+  color: var(--exam-ok);
+  font-size: 0.9rem;
+  margin: 0.4rem 0 0;
+}
+
+.nopWarn {
+  color: var(--exam-warn);
+  font-size: 0.9rem;
+  margin: 0.4rem 0 0;
+}
